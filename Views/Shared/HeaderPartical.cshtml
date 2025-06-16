@@ -1,0 +1,204 @@
+﻿<!DOCTYPE html>
+<html>
+<body>
+    <header class="header">
+        <div class="header-top">
+            <div class="logo">
+                <a href="@Url.Action("Index", "Home")">BeeGroup</a>
+            </div>
+            <div class="header-contacts">
+                <div class="phone">г. Караганда, Ермекова 60, офис 4</div>
+                <div class="orders">8 (778) 715 77 34</div>
+            </div>
+        </div>
+
+        <nav class="main-nav" style="position: relative;">
+            <ul class="nav-list" style="display: flex; gap: 15px; list-style: none; padding: 0; margin: 0; flex-wrap: wrap;">
+                <!-- Популярные услуги -->
+                <li><button class="service-btn" data-service="Базовая уборка">Базовая</button></li>
+                <li><button class="service-btn" data-service="Генеральная уборка">Генеральная</button></li>
+                <li><button class="service-btn" data-service="После ремонта">После ремонта</button></li>
+                <li><button class="service-btn" data-service="Окна и витрины">Окна</button></li>
+                <li><button class="service-btn" data-service="Уборка офисов">Офисы</button></li>
+                <!-- Кнопка "Ещё" -->
+                <li style="position: relative;">
+                    <button id="more-btn" class="service-btn">Ещё ▾</button>
+                </li>
+            </ul>
+
+            <!-- Выплывающий блок на всю ширину -->
+            <div id="more-dropdown" class="more-dropdown-full">
+                <div class="dropdown-section">
+                    <h5>Для квартир</h5>
+                    <ul>
+                        <li><button class="service-btn" data-service="Базовая уборка">Базовая уборка</button></li>
+                        <li><button class="service-btn" data-service="Генеральная уборка">Генеральная уборка</button></li>
+                        <li><button class="service-btn" data-service="После ремонта">После ремонта</button></li>
+                        <li><button class="service-btn" data-service="Мойка окон">Мойка окон</button></li>
+                        <li><button class="service-btn" data-service="Химчистка мебели">Химчистка мебели</button></li>
+                        <li><button class="service-btn" data-service="Уборка после мероприятий">Уборка после мероприятий</button></li>
+                        <li><button class="service-btn" data-service="Уборка кухни">Уборка кухни</button></li>
+                        <li><button class="service-btn" data-service="Уборка ванной">Уборка ванной</button></li>
+                        <li><button class="service-btn" data-service="Мойка балконов">Мойка балконов</button></li>
+                        <li><button class="service-btn" data-service="Чистка плитки">Чистка плитки</button></li>
+                        <li><button class="service-btn" data-service="Удаление плесени">Удаление плесени</button></li>
+                        <li><button class="service-btn" data-service="Уборка спальни">Уборка спальни</button></li>
+                        <li><button class="service-btn" data-service="Чистка ковров">Чистка ковров</button></li>
+                        <li><button class="service-btn" data-service="Уборка после животных">Уборка после животных</button></li>
+                        <li><button class="service-btn" data-service="Мытье холодильника">Мытье холодильника</button></li>
+                    </ul>
+                </div>
+
+                <div class="dropdown-section">
+                    <h5>Для юр. лиц</h5>
+                    <ul>
+                        <li><button class="service-btn" data-service="Уборка офисов">Уборка офисов</button></li>
+                        <li><button class="service-btn" data-service="Мойка фасадов">Мойка фасадов</button></li>
+                        <li><button class="service-btn" data-service="Вывоз мусора">Вывоз мусора</button></li>
+                        <li><button class="service-btn" data-service="Уборка после мероприятий">Уборка после мероприятий</button></li>
+                        <li><button class="service-btn" data-service="Уборка ТЦ">Уборка ТЦ</button></li>
+                        <li><button class="service-btn" data-service="Уборка складов">Уборка складов</button></li>
+                        <li><button class="service-btn" data-service="Уборка фабрик">Уборка фабрик</button></li>
+                        <li><button class="service-btn" data-service="Уборка ресторанов">Уборка ресторанов</button></li>
+                        <li><button class="service-btn" data-service="Чистка техники">Чистка техники</button></li>
+                        <li><button class="service-btn" data-service="Мойка витрин">Мойка витрин</button></li>
+                        <li><button class="service-btn" data-service="Уборка конференц-залов">Уборка конференц-залов</button></li>
+                        <li><button class="service-btn" data-service="Промышленная уборка">Промышленная уборка</button></li>
+       
+                        <li><button class="service-btn" data-service="Обслуживание зданий">Обслуживание зданий</button></li>
+                        <li><button class="service-btn" data-service="Ежедневная уборка">Ежедневная уборка</button></li>
+                    </ul>
+                </div>
+
+                <div class="dropdown-section">
+                    <h5>О нас</h5>
+                    <ul>
+                        <li><a href="@Url.Action("About", "Home")#history" class="service-btn">О компании</a></li>
+                   
+                        <li><a href="@Url.Action("Contacts", "Home")#contacts" class="service-btn">Контакты</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Войти / Профиль -->
+            <div class="login-link">
+                @if (Context.Session.GetString("MonkeyEmail") != null)
+                {
+                    <a href="@Url.Action("Profile", "Home")" class="action-link">Профиль</a>
+                }
+                else
+                {
+                    <a href="@Url.Action("Sing", "Home")" class="action-link">Войти</a>
+                }
+            </div>
+        </nav>
+
+        <!-- Стили -->
+        <style>
+            .service-btn {
+                background: none;
+                border: none;
+                color: #333;
+                font-size: 15px;
+                cursor: pointer;
+                padding: 5px 10px;
+                transition: color 0.3s;
+            }
+
+                .service-btn:hover {
+                    color: #1abc9c;
+                    text-decoration: underline;
+                }
+
+            .more-dropdown-full {
+                display: none;
+                position: absolute;
+                top: 100%;
+                left: 0;
+                width: 100%;
+                background-color: white;
+                border-top: 2px solid #1abc9c;
+                box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+                padding: 20px 40px;
+                z-index: 1000;
+                display: flex;
+                justify-content: space-around;
+                flex-wrap: wrap;
+            }
+
+            .dropdown-section {
+                min-width: 200px;
+            }
+
+                .dropdown-section h5 {
+                    font-size: 16px;
+                    color: #1abc9c;
+                    margin-bottom: 10px;
+                }
+
+                .dropdown-section ul {
+                    list-style: none;
+                    padding: 0;
+                    margin: 0;
+                }
+
+                .dropdown-section li {
+                    margin-bottom: 8px;
+                }
+
+                .dropdown-section a {
+                    color: #333;
+                    text-decoration: none;
+                    display: inline-block;
+                    padding: 5px;
+                }
+
+                    .dropdown-section a:hover {
+                        text-decoration: underline;
+                    }
+        </style>
+
+        <!-- Скрипт -->
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                const moreBtn = document.getElementById("more-btn");
+                const dropdown = document.getElementById("more-dropdown");
+
+                // Изначально скрываем меню (на всякий случай)
+                dropdown.style.display = "none";
+
+                // Обработчик кнопки "Ещё"
+                moreBtn.addEventListener("click", function (e) {
+                    e.stopPropagation(); // не всплывает к document
+                    dropdown.style.display = (dropdown.style.display === "flex") ? "none" : "flex";
+                });
+
+                // Закрытие при клике вне меню
+                document.addEventListener("click", function (e) {
+                    if (!dropdown.contains(e.target) && e.target !== moreBtn) {
+                        dropdown.style.display = "none";
+                    }
+                });
+
+                // Обработка всех кнопок с выбором услуги
+                document.querySelectorAll(".service-btn[data-service]").forEach(btn => {
+                    btn.addEventListener("click", function () {
+                        const service = this.getAttribute("data-service");
+
+                        // Подставляем услугу в input (если есть)
+                        const input = document.querySelector("#serviceInput");
+                        if (input) {
+                            input.value = service;
+                        }
+
+                        // Закрываем меню после выбора
+                        dropdown.style.display = "none";
+                    });
+                });
+            });
+        </script>
+
+
+    </header>
+</body>
+</html>

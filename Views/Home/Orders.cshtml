@@ -1,0 +1,322 @@
+﻿@{
+    ViewData["Title"] = "Админ-панель";
+    var orders = ViewBag.Orders as List<BeeGroup.Models.Order>;
+    var cleaners = ViewBag.Cleaners as List<BeeGroup.Models.Cleaner>;
+    var statuses = ViewBag.Statuses as List<string>;
+}
+
+<h2 class="mb-4">Админ-панель</h2>
+
+<ul class="nav nav-tabs mb-4">
+    <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#orders">Заказы</a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#cleaners">Клинеры</a>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- Заказы -->
+    <div class="tab-pane fade show active" id="orders">
+        <h4>Управление заказами</h4>
+        <input type="text" id="orderSearch" class="form-control mb-3" placeholder="Поиск по Email, услуге или статусу">
+
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Услуга</th>
+                    <th>Площадь</th>
+                    <th>Цена</th>
+                    <th>Статус</th>
+                    <th>Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                @if (orders == null || !orders.Any())
+                {
+                    <tr><td colspan="6">Нет заказов для отображения.</td></tr>
+                }
+                else
+                {
+                    foreach (var order in orders)
+                    {
+                        <tr>
+                            <td>@order.Email</td>
+                            <td>@order.ServiceType</td>
+                            <td>@order.ApartmentSize</td>
+                            <td>@order.Price</td>
+
+                            @if (order.Status == "Отменен")
+                            {
+                                <td colspan="2" class="text-danger">Заказ отменён</td>
+                            }
+                            else
+                            {
+                                <form asp-action="UpdateStatus" method="post" class="d-flex">
+                                    <input type="hidden" name="orderId" value="@order.Id" />
+                                <td>
+                                    <select name="newStatus" class="form-select form-select-sm" style="width:auto;">
+                                            @foreach (var status in statuses.Where(s => s != "Отменен"))
+                                            {
+                                            <option value="@status" selected="@(status == order.Status)">@status</option>
+                                            }
+                                    </select>
+                                </td>
+                                <td>
+                                    <button type="submit" class="btn btn-sm btn-primary">Сохранить</button>
+                                </td>
+                                </form>
+                            }
+                        </tr>
+                    }
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Клинеры -->
+    <div class="tab-pane fade" id="cleaners">
+        <h4>Список клинеров</h4>
+
+        <button class="btn btn-success mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#addCleanerForm">Добавить клинера</button>
+        <div class="collapse mb-4" id="addCleanerForm">
+            <form asp-action="AddCleaner" method="post">
+                <div class="row g-3">
+                    <div class="col-md-3"><input name="LastName" class="form-control" placeholder="Фамилия" required /></div>
+                    <div class="col-md-3"><input name="FirstName" class="form-control" placeholder="Имя" required /></div>
+                    <div class="col-md-3"><input name="MiddleName" class="form-control" placeholder="Отчество" required /></div>
+                    <input type="text" name="PhoneNumber" id="phoneNumber" class="form-control phone-input" placeholder="+7 ___ ___ __ __" required />
+                    <div class="col-md-6 mt-2">
+                        <select name="ServiceTypes" class="form-select" required>
+                            <option disabled selected value="">Выберите тип услуги</option>
+                            <option value="Генеральная уборка">Генеральная уборка</option>
+                            <option value="Поддерживающая уборка">Поддерживающая уборка</option>
+                            <option value="Уборка после ремонта">Уборка после ремонта</option>
+                            <option value="Мытьё окон">Мытьё окон</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary mt-3">Сохранить</button>
+            </form>
+        </div>
+
+        <input type="text" id="cleanerSearch" class="form-control mb-3" placeholder="Поиск по ФИО, телефону или услуге">
+
+        @if (cleaners == null || !cleaners.Any())
+        {
+            <div class="alert alert-info">Клинеры не найдены.</div>
+        }
+        else
+        {
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Фамилия</th>
+                        <th>Имя</th>
+                        <th>Отчество</th>
+                        <th>Телефон</th>
+                        <th>Типы услуг</th>
+                        <th>Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var cleaner in cleaners)
+                    {
+                        <tr id="row-@cleaner.CleanerId">
+                            <form asp-action="UpdateCleaner" method="post" class="edit-form">
+                                <input type="hidden" name="CleanerId" value="@cleaner.CleanerId" />
+
+                            <td>
+                                <span class="view">@cleaner.LastName</span>
+                                <input type="text" name="LastName" class="form-control edit d-none" value="@cleaner.LastName" />
+                            </td>
+                            <td>
+                                <span class="view">@cleaner.FirstName</span>
+                                <input type="text" name="FirstName" class="form-control edit d-none" value="@cleaner.FirstName" />
+                            </td>
+                            <td>
+                                <span class="view">@cleaner.MiddleName</span>
+                                <input type="text" name="MiddleName" class="form-control edit d-none" value="@cleaner.MiddleName" />
+                            </td>
+                            <td>
+                                <span class="view">@cleaner.PhoneNumber</span>
+                                <input type="text" name="PhoneNumber" class="form-control phone-input edit d-none" value="@cleaner.PhoneNumber" />
+                            </td>
+                            <td>
+                                <span class="view">@cleaner.ServiceTypes</span>
+                                <select name="ServiceTypes" class="form-select edit d-none">
+                                    <option value="Генеральная уборка" selected="@(cleaner.ServiceTypes == "Генеральная уборка")">Генеральная уборка</option>
+                                    <option value="Поддерживающая уборка" selected="@(cleaner.ServiceTypes == "Поддерживающая уборка")">Поддерживающая уборка</option>
+                                    <option value="Уборка после ремонта" selected="@(cleaner.ServiceTypes == "Уборка после ремонта")">Уборка после ремонта</option>
+                                    <option value="Мытьё окон" selected="@(cleaner.ServiceTypes == "Мытьё окон")">Мытьё окон</option>
+                                </select>
+                            </td>
+                            <td>
+                                <button type="button" class="btn btn-sm btn-secondary btn-edit">
+                                    <i class="bi bi-pencil-square"></i>Редактировать
+                                </button>
+                                <button type="submit" class="btn btn-sm btn-primary d-none btn-save">
+                                    <i class="bi bi-check2-square"></i>Сохранить
+                                </button>
+
+                                <form asp-action="DeleteCleaner" method="post" style="display:inline;">
+                                    <input type="hidden" name="cleanerId" value="@cleaner.CleanerId" />
+                                    <button type="button" class="btn btn-sm btn-danger btn-delete-cleaner" data-id="@cleaner.CleanerId">
+                                        <i class="bi bi-trash"></i>Удалить
+                                    </button>
+                                </form>
+                            </td>
+                            </form>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        }
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        document.querySelectorAll('.phone-input').forEach(function (phoneInput) {
+            phoneInput.addEventListener('input', maskPhone);
+            function maskPhone() {
+                let val = phoneInput.value.replace(/\D/g, '');
+                if (val.startsWith('8')) val = '7' + val.slice(1);
+                if (!val.startsWith('7')) val = '7' + val;
+                let formatted = '+7';
+                if (val.length > 1) formatted += ' ' + val.substring(1, 4).padEnd(3, '_');
+                if (val.length >= 4) formatted += ' ' + val.substring(4, 7).padEnd(3, '_');
+                if (val.length >= 7) formatted += ' ' + val.substring(7, 9).padEnd(2, '_');
+                if (val.length >= 9) formatted += ' ' + val.substring(9, 11).padEnd(2, '_');
+                phoneInput.value = formatted;
+            }
+        });
+
+        document.getElementById("orderSearch").addEventListener("input", function () {
+            const value = this.value.toLowerCase();
+            document.querySelectorAll("#orders table tbody tr").forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(value) ? "" : "none";
+            });
+        });
+
+        document.getElementById("cleanerSearch").addEventListener("input", function () {
+            const value = this.value.toLowerCase();
+            document.querySelectorAll("#cleaners table tbody tr").forEach(row => {
+                row.style.display = row.innerText.toLowerCase().includes(value) ? "" : "none";
+            });
+        });
+
+        document.querySelectorAll(".btn-edit").forEach(button => {
+            button.addEventListener("click", function () {
+                const row = this.closest("tr");
+                row.querySelectorAll(".view").forEach(el => el.classList.add("d-none"));
+                row.querySelectorAll(".edit").forEach(el => el.classList.remove("d-none"));
+                this.classList.add("d-none");
+                row.querySelector(".btn-save").classList.remove("d-none");
+            });
+        });
+
+        document.querySelectorAll(".btn-delete-cleaner").forEach(button => {
+            button.addEventListener("click", function () {
+                const cleanerId = this.dataset.id;
+                if (!confirm("Вы уверены, что хотите удалить клинера?")) return;
+
+                fetch('/Home/DeleteCleaner', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'RequestVerificationToken': document.querySelector('input[name="__RequestVerificationToken"]')?.value || ''
+                    },
+                    body: JSON.stringify(cleanerId)
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.success) {
+                            const row = document.querySelector(`#row-${cleanerId}`);
+                            if (row) row.remove();
+                        } else {
+                            alert(data.message || "Ошибка при удалении.");
+                        }
+                    });
+            });
+        });
+    });
+</script>
+<style>
+    header {
+        display: none;
+    }
+
+    .card {
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        border: none;
+        margin-bottom: 30px;
+    }
+
+    .card-header {
+        background-color: #f8f9fa;
+        font-weight: bold;
+        font-size: 1.2rem;
+        border-bottom: 1px solid #e0e0e0;
+    }
+
+    .table th {
+        background-color: #f1f3f5;
+        font-weight: 500;
+    }
+
+    .btn-sm {
+        padding: 4px 10px;
+        font-size: 0.85rem;
+    }
+
+    .btn-edit, .btn-save, .btn-delete-cleaner {
+        margin-right: 4px;
+    }
+
+    .nav-tabs .nav-link.active {
+        background-color: #e9ecef;
+        border-color: #dee2e6 #dee2e6 #fff;
+        color: #212529;
+        font-weight: 500;
+    }
+
+    .nav-tabs .nav-link {
+        border-radius: 8px 8px 0 0;
+    }
+
+    .form-select,
+    .form-control {
+        border-radius: 6px;
+    }
+
+    .btn-primary, .btn-success {
+        border-radius: 6px;
+    }
+
+    .form-control:focus,
+    .form-select:focus {
+        border-color: #5e9eff;
+        box-shadow: 0 0 0 0.15rem rgba(0,123,255,.25);
+    }
+
+    input[type="text"], select {
+        transition: 0.2s ease-in-out;
+    }
+
+    .table td, .table th {
+        vertical-align: middle;
+    }
+
+    .table-hover tbody tr:hover {
+        background-color: #f8f9fa;
+    }
+
+    .btn i {
+        margin-right: 4px;
+    }
+</style>

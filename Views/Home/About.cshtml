@@ -1,0 +1,167 @@
+﻿@{
+    Layout = "_Layout";
+}
+
+<style>
+    .about-hero {
+        background: url('~/image/about-hero.jpg') center/cover no-repeat;
+        padding: 100px 20px;
+        text-align: center;
+        color: white;
+    }
+
+    .about-hero h1 {
+        font-size: 3em;
+        margin-bottom: 15px;
+        background-color: rgba(0, 0, 0, 0.6);
+        display: inline-block;
+        padding: 10px 20px;
+        border-radius: 8px;
+    }
+
+    .about-hero p {
+        font-size: 1.2em;
+        background-color: rgba(0, 0, 0, 0.4);
+        display: inline-block;
+        padding: 8px 16px;
+        border-radius: 6px;
+    }
+
+    .container {
+        max-width: 1000px;
+        margin: auto;
+        padding: 40px 20px;
+    }
+
+    .timeline-item {
+        margin-bottom: 30px;
+    }
+
+    .timeline-item .year {
+        font-size: 1.3em;
+        font-weight: bold;
+        color: #0ba48f;
+    }
+
+    .timeline-item h3 {
+        margin: 10px 0 5px;
+    }
+
+    .timeline-item p {
+        margin: 0;
+        line-height: 1.6;
+    }
+
+    .values-section, .team-section {
+        background-color: #f9f9f9;
+        padding: 40px 20px;
+    }
+
+    .section-title {
+        text-align: center;
+        font-size: 2em;
+        margin-bottom: 30px;
+        color: #333;
+    }
+
+    .values-list, .team-list {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        justify-content: center;
+    }
+
+    .value-item {
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        flex: 1 1 250px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
+        text-align: center;
+    }
+
+    .value-item h3 {
+        margin-bottom: 10px;
+        color: #0ba48f;
+    }
+
+    .team-member {
+        text-align: center;
+        max-width: 220px;
+    }
+
+    .team-member img {
+        width: 150px;
+        height: 150px;
+        object-fit: cover;
+        border-radius: 50%;
+        margin-bottom: 10px;
+    }
+
+    .team-member h4 {
+        margin: 5px 0;
+        font-size: 1.1em;
+    }
+
+    .team-member p {
+        color: #666;
+        font-size: 0.95em;
+    }
+
+ 
+</style>
+
+<section class="about-hero">
+    <h1>О компании BeeGroup</h1>
+    <p>Мы создаём чистую и уютную среду с 2019 года</p>
+</section>
+
+<section class="container">
+    <div class="timeline-item">
+        <div class="year">2019</div>
+        <h3>Начало пути</h3>
+        <p>Открыта компания BeeGroup — с амбициями стать лучшими в Караганде. Первые клиенты оценили нас как надёжных и внимательных в каждой детали.</p>
+    </div>
+    <div class="timeline-item">
+        <div class="year">2020</div>
+        <h3>Расширение услуг</h3>
+        <p>Добавили химчистку мебели, уборку после ремонта и специальных объектов. Установили жёсткие стандарты качества и приступили к обучению персонала.</p>
+    </div>
+    <div class="timeline-item">
+        <div class="year">2021</div>
+        <h3>Работа с бизнесом</h3>
+        <p>Начали работать с офисами, ТЦ и кафе. Запустили регулярный клининг и обеспечили персонал кофе-леди (до 2023).</p>
+    </div>
+    <div class="timeline-item">
+        <div class="year">2023</div>
+        <h3>Оптимизация процесса</h3>
+        <p>Мы отказались от кофе-леди, автоматизировали заказы, улучшили логистику и перешли на клиент-ориентированную модель с личным кабинетом.</p>
+    </div>
+    <div class="timeline-item">
+        <div class="year">2025</div>
+        <h3>Современный подход</h3>
+        <p>Разработаны новые экологичные средства, оптимизирована цифровая платформа. BeeGroup — это чистота, забота и комфорт для всех.</p>
+    </div>
+</section>
+
+<section class="values-section">
+    <div class="container">
+        <h2 class="section-title">Наши ценности</h2>
+        <div class="values-list">
+            <div class="value-item">
+                <h3>Качество</h3>
+                <p>Используем проверенные материалы, обучаем персонал и следим за результатом.</p>
+            </div>
+            <div class="value-item">
+                <h3>Безопасность</h3>
+                <p>Экологичные средства, сертифицированное оборудование, строгие стандарты.</p>
+            </div>
+            <div class="value-item">
+                <h3>Доступность</h3>
+                <p>Честные цены, прозрачные расчёты и персонализированный подход.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+

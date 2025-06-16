@@ -1,0 +1,711 @@
+﻿@using Microsoft.AspNetCore.Http
+@{
+    var email = Context.Session.GetString("MonkeyEmail");
+    var userRole = Context.Session.GetString("UserRole");
+}
+
+<script>
+    window.userEmail = '@email';
+</script>
+
+<!DOCTYPE HTML>
+
+<html>
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+    <link rel="stylesheet" href="assets/css/main.css" />
+</head>
+<body>
+@*     @if (userRole == "admin")
+    {
+        <div style="text-align:right;">
+            <a href="/Home/Orders" class="btn btn-warning" style="margin: 10px 0;">Админ-панель</a>
+        </div>
+    } *@
+    <section class="calculator">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h1 id="selected-service-name" style="font-size: 3em; font-weight: 900; color: #1e88e5; margin-bottom: 20px; text-align: left;">
+                <!-- Название услуги -->
+            </h1>
+
+            <div style="display: flex; align-items: center; gap: 15px; text-align: left;">
+                <div class="badge"><img src="~/image/stamp.c0825c4.svg" /></div>
+                <div style="font-size: 1.2em; line-height: 1.6;">
+                    Гарантия<br />
+                    Качество<br />
+                    Безопасность
+                </div>
+            </div>
+        </div>
+
+        <div>
+            <strong>Площадь квартиры</strong>
+            <div class="apartment-size">
+                <button class="size-btn" data-size="40">40</button>
+                <button class="size-btn" data-size="50">50</button>
+                <button class="size-btn" data-size="60">60</button>
+                <button class="size-btn" data-size="70">70</button>
+                <button class="size-btn" data-size="80">80</button>
+                <button class="size-btn" data-size="90">90</button>
+                <input type="number" class="size-input" placeholder="м²" min="10" />
+            </div>
+        </div>
+
+        <div class="dropdowns">
+            <select id="service" class="form-select">
+                <option selected>Базовая уборка</option>
+            </select>
+
+
+            <select id="regularity" class="form-select">
+                <option value="Разовая">Разовая</option>
+                <option value="Еженедельно">Еженедельно</option>
+                <option value="Раз в месяц">Раз в месяц</option>
+            </select>
+        </div>
+
+        <div class="price">Цена: от <span id="price">—</span></div>
+        <button class="btn-order">Заказать</button>
+    </section>
+
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const sizeButtons = document.querySelectorAll('.size-btn');
+            const sizeInput = document.querySelector('.size-input');
+            const serviceSelect = document.getElementById('service');
+            const regularitySelect = document.getElementById('regularity');
+            const priceDisplay = document.getElementById('price');
+            const orderButton = document.querySelector('.btn-order');
+            const serviceNameHeading = document.getElementById('selected-service-name');
+
+            let selectedSize = 40;
+
+            const serviceMultipliers = {
+                "Базовая уборка": 300,
+                "Генеральная уборка": 500,
+                "Уборка после ремонта": 900,
+                "Мойка окон": 400,
+                "Химчистка мебели": 800,
+                "Уборка после мероприятий": 950,
+                "Уборка кухни": 450,
+                "Уборка ванной": 400,
+                "Мойка балконов": 300,
+                "Чистка плитки": 350,
+                "Удаление плесени": 600,
+                "Уборка спальни": 400,
+                "Чистка ковров": 500,
+                "Уборка после животных": 550,
+                "Мытье холодильника": 250,
+                "Уборка офисов": 600,
+                "Мойка фасадов": 1000,
+                "Вывоз мусора": 700,
+                "Уборка ТЦ": 850,
+                "Уборка складов": 750,
+                "Уборка фабрик": 800,
+                "Уборка ресторанов": 900,
+                "Чистка техники": 650,
+                "Мойка витрин": 500,
+                "Уборка конференц-залов": 700,
+                "Промышленная уборка": 1200,
+                "Обслуживание зданий": 1000,
+                "Ежедневная уборка": 550
+            };
+
+            const regularityDiscounts = {
+                "Разовая": 1,
+                "Еженедельно": 0.9,
+                "Раз в месяц": 0.95
+            };
+
+            function updatePrice() {
+                const service = serviceSelect.value;
+                const regularity = regularitySelect.value;
+                const basePrice = selectedSize * (serviceMultipliers[service] || 0);
+                const finalPrice = Math.round(basePrice * (regularityDiscounts[regularity] || 1));
+                priceDisplay.textContent = finalPrice.toLocaleString('ru-RU') + ' тг';
+
+                if (serviceNameHeading) {
+                    serviceNameHeading.textContent = service;
+                }
+            }
+
+            // По умолчанию активна первая кнопка
+            sizeButtons.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    sizeButtons.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    selectedSize = parseInt(btn.dataset.size);
+                    sizeInput.value = '';
+                    updatePrice();
+                });
+            });
+
+            sizeInput.addEventListener('input', () => {
+                sizeButtons.forEach(b => b.classList.remove('active'));
+                const val = parseInt(sizeInput.value);
+                if (!isNaN(val) && val >= 10) {
+                    selectedSize = val;
+                    updatePrice();
+                } else {
+                    priceDisplay.textContent = '— тг';
+                }
+            });
+
+            serviceSelect.addEventListener('change', updatePrice);
+            regularitySelect.addEventListener('change', updatePrice);
+
+            // Устанавливаем первую кнопку активной
+            sizeButtons[0].classList.add('active');
+            updatePrice();
+
+            orderButton.addEventListener('click', () => {
+                const userEmail = window.userEmail;
+
+                if (!userEmail || userEmail.trim() === "") {
+                    alert("Вы должны авторизоваться, чтобы оформить заказ.");
+                    return;
+                }
+
+                const serviceType = serviceSelect.value;
+                const regularity = regularitySelect.value;
+                const apartmentSize = selectedSize;
+                const priceText = priceDisplay.textContent.replace(/\D/g, '');
+                const price = parseFloat(priceText);
+
+                if (!apartmentSize || !serviceType || !regularity || isNaN(price)) {
+                    alert("Заполните все поля корректно.");
+                    return;
+                }
+
+                const orderData = {
+                    email: userEmail,
+                    serviceType: serviceType,
+                    regularity: regularity,
+                    apartmentSize: apartmentSize,
+                    price: price
+                };
+
+                fetch('/api/order/submit', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(orderData)
+                })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.text().then(text => { throw new Error(text); });
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                    })
+                    .catch(error => {
+                        console.error('Ошибка:', error);
+                        alert('Произошла ошибка при отправке заказа.');
+                    });
+            });
+
+            // Хедер кнопки (выпадающее меню)
+            const headerButtons = document.querySelectorAll(".service-btn");
+
+            const serviceMap = {
+                "Базовая уборка": "Базовая уборка",
+                "Генеральная уборка": "Генеральная уборка",
+                "После ремонта": "Уборка после ремонта",
+                "Мойка окон": "Мойка окон",
+                "Химчистка мебели": "Химчистка мебели",
+                "Уборка после мероприятий": "Уборка после мероприятий",
+                "Уборка кухни": "Уборка кухни",
+                "Уборка ванной": "Уборка ванной",
+                "Мойка балконов": "Мойка балконов",
+                "Чистка плитки": "Чистка плитки",
+                "Удаление плесени": "Удаление плесени",
+                "Уборка спальни": "Уборка спальни",
+                "Чистка ковров": "Чистка ковров",
+                "Уборка после животных": "Уборка после животных",
+                "Мытье холодильника": "Мытье холодильника",
+                "Уборка офисов": "Уборка офисов",
+                "Мойка фасадов": "Мойка фасадов",
+                "Вывоз мусора": "Вывоз мусора",
+                "Уборка ТЦ": "Уборка ТЦ",
+                "Уборка складов": "Уборка складов",
+                "Уборка фабрик": "Уборка фабрик",
+                "Уборка ресторанов": "Уборка ресторанов",
+                "Чистка техники": "Чистка техники",
+                "Мойка витрин": "Мойка витрин",
+                "Уборка конференц-залов": "Уборка конференц-залов",
+                "Промышленная уборка": "Промышленная уборка",
+                "Обслуживание зданий": "Обслуживание зданий",
+                "Ежедневная уборка": "Ежедневная уборка"
+            };
+
+            headerButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    const clickedService = button.getAttribute("data-service");
+                    const valueForSelect = serviceMap[clickedService];
+
+                    if (valueForSelect) {
+                        // Очищаем select и добавляем только нужную опцию
+                        serviceSelect.innerHTML = "";
+                        const option = document.createElement("option");
+                        option.value = valueForSelect;
+                        option.textContent = valueForSelect;
+                        option.selected = true;
+                        serviceSelect.appendChild(option);
+
+                        // Обновляем заголовок
+                        if (serviceNameHeading) {
+                            serviceNameHeading.textContent = valueForSelect;
+                        }
+
+                        // Обновляем цену
+                        const event = new Event("change");
+                        serviceSelect.dispatchEvent(event);
+
+                        // Скроллим к калькулятору
+                        const calculatorBlock = document.querySelector(".calculator");
+                        if (calculatorBlock) {
+                            calculatorBlock.scrollIntoView({ behavior: "smooth" });
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const headerButtons = document.querySelectorAll(".service-btn");
+            const serviceSelect = document.getElementById("service");
+            const descriptionBlock = document.getElementById("service-description");
+            const serviceNameHeading = document.getElementById("selected-service-name");
+
+            const serviceMap = {
+                "Базовая уборка": "Базовая уборка",
+                "Генеральная уборка": "Генеральная уборка",
+                "После ремонта": "Уборка после ремонта",
+                "Мойка окон": "Мойка окон",
+                "Химчистка мебели": "Химчистка мебели",
+                "Уборка после мероприятий": "Уборка после мероприятий",
+                "Уборка кухни": "Уборка кухни",
+                "Уборка ванной": "Уборка ванной",
+                "Мойка балконов": "Мойка балконов",
+                "Чистка плитки": "Чистка плитки",
+                "Удаление плесени": "Удаление плесени",
+                "Уборка спальни": "Уборка спальни",
+                "Чистка ковров": "Чистка ковров",
+                "Уборка после животных": "Уборка после животных",
+                "Мытье холодильника": "Мытье холодильника",
+                "Уборка офисов": "Уборка офисов",
+                "Мойка фасадов": "Мойка фасадов",
+                "Вывоз мусора": "Вывоз мусора",
+                "Уборка ТЦ": "Уборка ТЦ",
+                "Уборка складов": "Уборка складов",
+                "Уборка фабрик": "Уборка фабрик",
+                "Уборка ресторанов": "Уборка ресторанов",
+                "Чистка техники": "Чистка техники",
+                "Мойка витрин": "Мойка витрин",
+                "Уборка конференц-залов": "Уборка конференц-залов",
+                "Промышленная уборка": "Промышленная уборка",
+                "Обслуживание зданий": "Обслуживание зданий",
+                "Ежедневная уборка": "Ежедневная уборка"
+            };
+
+            headerButtons.forEach(button => {
+                button.addEventListener("click", () => {
+                    const clickedService = button.getAttribute("data-service");
+                    const valueForSelect = serviceMap[clickedService];
+
+                    if (valueForSelect) {
+                        // Очищаем <select> и добавляем только выбранную услугу
+                        serviceSelect.innerHTML = "";
+                        const option = document.createElement("option");
+                        option.value = valueForSelect;
+                        option.textContent = valueForSelect;
+                        serviceSelect.appendChild(option);
+
+                        // Обновляем заголовок
+                        if (serviceNameHeading) {
+                            serviceNameHeading.textContent = valueForSelect;
+                        }
+
+                        // Триггерим пересчёт
+                        const event = new Event("change");
+                        serviceSelect.dispatchEvent(event);
+
+                        // Показываем описание услуги, если есть
+                        const infoBlock = document.getElementById("service-info-block");
+                        if (infoBlock && descriptionBlock && typeof serviceDescriptions !== 'undefined') {
+                            const description = serviceDescriptions[valueForSelect];
+                            if (description) {
+                                descriptionBlock.textContent = description;
+                                infoBlock.style.display = "block";
+                            }
+                        }
+
+                        // Скроллим к калькулятору
+                        const calculatorBlock = document.querySelector(".calculator");
+                        if (calculatorBlock) {
+                            calculatorBlock.scrollIntoView({ behavior: "smooth" });
+                        }
+                    }
+                });
+            });
+        });
+    </script>
+
+
+
+    <!-- Main -->
+    <div class="steps-container">
+        <h2 class="main-title">Как заказать клининг?</h2>
+
+        <div class="steps-wrapper">
+            <!-- Шаг 1 -->
+            <article class="step-card">
+                <div class="step-number">ШАГ 1</div>
+                <h3 class="step-title">Узнайте цену</h3>
+                <p class="step-description">Укажите площадь квартиры, выберите дату и время. Мгновенно узнайте точную цену услуги</p>
+            </article>
+
+            <!-- Шаг 2 -->
+            <article class="step-card">
+                <div class="step-number">ШАГ 2</div>
+                <h3 class="step-title">Дальше мы всё сделаем сами</h3>
+                <p class="step-description">Мы сами подберём лучших исполнителей и отправим их к вам в нужное время. Вам остаётся открыть дверь. Вы можете покинуть квартиру на время уборки</p>
+            </article>
+
+            <!-- Шаг 3 -->
+            <article class="step-card">
+                <div class="step-number">ШАГ 3</div>
+                <h3 class="step-title">Наслаждайтесь чистотой</h3>
+                <p class="step-description">Исполнители сами знают, что им нужно делать — они работают по чёткому чек-листу. Если вы прикрепили карту, то все взаиморасчёты мы проведём за вас</p>
+            </article>
+        </div>
+    </div>
+
+
+    <!--Карточки услуг-->
+    <!-- Карточки услуг с каруселью -->
+    <div class="services-carousel">
+        <div class="carousel-wrapper">
+            <!-- Стрелка назад -->
+            <button class="carousel-arrow prev">‹</button>
+
+            <!-- Контейнер с карточками -->
+            <div class="carousel-container">
+                <!-- Поддерживающая уборка -->
+                <div class="service-card">
+                    <div class="service-header">Поддерживающая уборка</div>
+                    <div class="service-content">
+                        <p class="description">Ежедневная чистка для поддержания порядка</p>
+                        <ul class="features-list">
+                            <li class="feature-item">1-2 исполнителя</li>
+                            <li class="feature-item">Удаление поверхностной пыли</li>
+                            <li class="feature-item">Влажная уборка полов</li>
+                            <li class="feature-item">Работа до 2 часов</li>
+                        </ul>
+                        <p class="price">от 3 500 тг</p>
+                    </div>
+                </div>
+                <!-- Генеральная уборка -->
+                <div class="service-card">
+                    <div class="service-header">Генеральная уборка</div>
+                    <div class="service-content">
+                        <p class="description">Глубокая чистка всех помещений</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ 2-3 исполнителя</li>
+                            <li class="feature-item">✓ Удаление стойких загрязнений</li>
+                            <li class="feature-item">✓ Уборка труднодоступных мест</li>
+                            <li class="feature-item">✓ Работа до 5 часов</li>
+                        </ul>
+                        <p class="price">от 8 000 тг</p>
+                    </div>
+                </div>
+
+                <!-- Уборка после ремонта -->
+                <div class="service-card">
+                    <div class="service-header">Уборка после ремонта</div>
+                    <div class="service-content">
+                        <p class="description">Удаление строительной пыли и остатков</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ 3-4 исполнителя</li>
+                            <li class="feature-item">✓ Спецсредства против загрязнений</li>
+                            <li class="feature-item">✓ Мытьё окон и стен</li>
+                            <li class="feature-item">✓ Работа до 6 часов</li>
+                        </ul>
+                        <p class="price">от 12 000 тг</p>
+                    </div>
+                </div>
+
+                <!-- Уборка после вечеринки -->
+                <div class="service-card">
+                    <div class="service-header">Уборка после вечеринки</div>
+                    <div class="service-content">
+                        <p class="description">Быстрая уборка после мероприятий</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ Сбор мусора и разливов</li>
+                            <li class="feature-item">✓ Дезинфекция поверхностей</li>
+                            <li class="feature-item">✓ Ароматизация помещения</li>
+                            <li class="feature-item">✓ Работа до 3 часов</li>
+                        </ul>
+                        <p class="price">от 6 500 тг</p>
+                    </div>
+                </div>
+
+                <!-- Уборка офиса -->
+                <div class="service-card">
+                    <div class="service-header">Уборка офиса</div>
+                    <div class="service-content">
+                        <p class="description">Поддержание чистоты в рабочем пространстве</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ Уборка рабочих мест</li>
+                            <li class="feature-item">✓ Мытьё полов и стеклянных поверхностей</li>
+                            <li class="feature-item">✓ Вынос мусора</li>
+                            <li class="feature-item">✓ Работа 1-2 раза в неделю</li>
+                        </ul>
+                        <p class="price">от 5 200 тг</p>
+                    </div>
+                </div>
+
+                <!-- Химчистка мягкой мебели -->
+                <div class="service-card">
+                    <div class="service-header">Химчистка мебели</div>
+                    <div class="service-content">
+                        <p class="description">Удаление пятен и запахов с мебели</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ Специальные средства</li>
+                            <li class="feature-item">✓ Для диванов, кресел, стульев</li>
+                            <li class="feature-item">✓ Безопасно для детей и животных</li>
+                            <li class="feature-item">✓ Работа до 2 часов</li>
+                        </ul>
+                        <p class="price">от 4 800 тг</p>
+                    </div>
+                </div>
+
+                <!-- Мытьё окон -->
+                <div class="service-card">
+                    <div class="service-header">Мытьё окон</div>
+                    <div class="service-content">
+                        <p class="description">Профессиональная чистка окон внутри и снаружи</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ До 10 окон за визит</li>
+                            <li class="feature-item">✓ Без разводов</li>
+                            <li class="feature-item">✓ Использование безопасных средств</li>
+                            <li class="feature-item">✓ Работа до 3 часов</li>
+                        </ul>
+                        <p class="price">от 6 000 тг</p>
+                    </div>
+                </div>
+
+                <!-- Уборка после животных -->
+                <div class="service-card">
+                    <div class="service-header">Уборка после животных</div>
+                    <div class="service-content">
+                        <p class="description">Удаление шерсти и запахов</p>
+                        <ul class="features-list">
+                            <li class="feature-item">✓ Специальные пылесосы</li>
+                            <li class="feature-item">✓ Очистка ковров и мебели</li>
+                            <li class="feature-item">✓ Дезинфекция мест пребывания</li>
+                            <li class="feature-item">✓ Работа до 4 часов</li>
+                        </ul>
+                        <p class="price">от 7 300 тг</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Стрелка вперёд -->
+            <button class="carousel-arrow next">›</button>
+        </div>
+
+        <!-- Навигационные точки -->
+        <div class="carousel-dots">
+            <span class="dot active"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+        </div>
+    </div>
+
+
+    <!--Скрипт для карточек-->
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const carousel = document.querySelector('.carousel-container');
+            const prevBtn = document.querySelector('.carousel-arrow.prev');
+            const nextBtn = document.querySelector('.carousel-arrow.next');
+            const dots = document.querySelectorAll('.dot');
+            const cardWidth = document.querySelector('.service-card').offsetWidth;
+            const gap = 25; // Совпадает с gap в CSS
+            let scrollPosition = 0;
+
+            // Обновление активной точки
+            function updateDots() {
+                const activeIndex = Math.round(scrollPosition / (cardWidth + gap));
+                dots.forEach((dot, index) => {
+                    dot.classList.toggle('active', index === activeIndex);
+                });
+            }
+
+            // Клик по стрелке "Назад"
+            prevBtn.addEventListener('click', () => {
+                scrollPosition = Math.max(scrollPosition - (cardWidth + gap), 0);
+                carousel.scrollTo({
+                    left: scrollPosition,
+                    behavior: 'smooth'
+                });
+                updateDots();
+            });
+
+            // Клик по стрелке "Вперед"
+            nextBtn.addEventListener('click', () => {
+                const maxScroll = carousel.scrollWidth - carousel.clientWidth;
+                scrollPosition = Math.min(scrollPosition + (cardWidth + gap), maxScroll);
+                carousel.scrollTo({
+                    left: scrollPosition,
+                    behavior: 'smooth'
+                });
+                updateDots();
+            });
+
+            // Клик по точкам
+            dots.forEach((dot, index) => {
+                dot.addEventListener('click', () => {
+                    scrollPosition = index * (cardWidth + gap);
+                    carousel.scrollTo({
+                        left: scrollPosition,
+                        behavior: 'smooth'
+                    });
+                    updateDots();
+                });
+            });
+
+            // Инициализация при загрузке
+            updateDots();
+        });
+    </script>
+    <!--Заказчики емае-->
+    <section class="clients">
+        <h2>Наши заказчики</h2>
+        <div class="clients-row">
+            <div class="client"><img src="~/image/magnum.webp" alt="Magnum"></div>
+            <div class="client"><img src="~/image/small_syper.webp" alt="Small Supermarket"></div>
+            <div class="client"><img src="~/image/ydd.webp" alt="YDD"></div>
+            <div class="client"><img src="~/image/arista.webp" alt="Arista"></div>
+        </div>
+        <div class="clients-row">
+            <div class="client"><img src="~/image/kaz_tem.webp" alt="Казахстан Темир Жолы"></div>
+            <div class="client"><img src="~/image/invictus.webp" alt="Invictus Go"></div>
+            <div class="client"><img src="~/image/kama.webp" alt="Kama Tyres"></div>
+        </div>
+    </section>
+
+    <style>
+        .clients {
+            text-align: center;
+            padding: 60px 20px;
+            /* background-color: #f0f4f8; */
+        }
+
+            .clients h2 {
+                font-size: 28px;
+                margin-bottom: 40px;
+                color: #333;
+            }
+
+        .clients-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 40px;
+            margin-bottom: 30px;
+        }
+
+        .client img {
+            max-height: 60px;
+            object-fit: contain;
+            transition: transform 0.3s ease;
+        }
+
+            .client img:hover {
+                transform: scale(3.05);
+            }
+    </style>
+
+    <!-- Футер -->
+    <footer class="site-footer" style="background: #f9f9f9; padding: 40px 20px; color: #333;">
+        <div class="footer-container" style="max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 30px;">
+
+            <!-- Для квартир -->
+            <div class="footer-column">
+                <h4>Для квартир</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><button class="service-btn" data-service="Базовая уборка">Базовая уборка</button></li>
+                    <li><button class="service-btn" data-service="Генеральная уборка">Генеральная уборка</button></li>
+                    <li><button class="service-btn" data-service="После ремонта">После ремонта</button></li>
+                    <li><button class="service-btn" data-service="Мойка окон">Мойка окон</button></li>
+                    <li><button class="service-btn" data-service="Химчистка мебели">Химчистка мебели</button></li>
+                    <li><button class="service-btn" data-service="Уборка после мероприятий">После мероприятий</button></li>
+                    <li><button class="service-btn" data-service="Уборка кухни">Уборка кухни</button></li>
+                    <li><button class="service-btn" data-service="Уборка ванной">Уборка ванной</button></li>
+                    <li><button class="service-btn" data-service="Мойка балконов">Мойка балконов</button></li>
+                    <li><button class="service-btn" data-service="Удаление плесени">Удаление плесени</button></li>
+                </ul>
+            </div>
+
+            <!-- Для юр. лиц -->
+            <div class="footer-column">
+                <h4>Для юр. лиц</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><button class="service-btn" data-service="Уборка офисов">Уборка офисов</button></li>
+                    <li><button class="service-btn" data-service="Мойка фасадов">Мойка фасадов</button></li>
+                    <li><button class="service-btn" data-service="Вывоз мусора">Вывоз мусора</button></li>
+                    <li><button class="service-btn" data-service="Уборка ТЦ">Уборка ТЦ</button></li>
+                    <li><button class="service-btn" data-service="Уборка складов">Уборка складов</button></li>
+                    <li><button class="service-btn" data-service="Уборка фабрик">Уборка фабрик</button></li>
+                    <li><button class="service-btn" data-service="Уборка ресторанов">Уборка ресторанов</button></li>
+                    <li><button class="service-btn" data-service="Чистка техники">Чистка техники</button></li>
+                    <li><button class="service-btn" data-service="Уборка конференц-залов">Конференц-залы</button></li>
+                    <li><button class="service-btn" data-service="Промышленная уборка">Промышленная уборка</button></li>
+                </ul>
+            </div>
+
+            <!-- О нас -->
+            <div class="footer-column">
+                <h4>О нас</h4>
+                <ul style="list-style: none; padding: 0;">
+                    <li><a href="@Url.Action("About", "Home")#history" class="service-btn">О компании</a></li>
+                    <li><a href="@Url.Action("Contacts", "Home")#contacts" class="service-btn">Контакты</a></li>
+                </ul>
+            </div>
+
+        </div>
+
+        <script>
+            // Повторно подключим обработчики для кнопок в футере
+            document.querySelectorAll("footer .service-btn[data-service]").forEach(btn => {
+                btn.addEventListener("click", function () {
+                    const service = this.getAttribute("data-service");
+                    const input = document.querySelector("#serviceInput");
+                    if (input) {
+                        input.value = service;
+                        input.dispatchEvent(new Event("input"));
+                    }
+
+                    // Прокрутка к калькулятору
+                    const calculator = document.querySelector("#calculator");
+                    if (calculator) {
+                        calculator.scrollIntoView({ behavior: "smooth" });
+                    }
+                });
+            });
+        </script>
+    </footer>
+
+</body>
+</html>

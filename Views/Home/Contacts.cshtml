@@ -1,0 +1,135 @@
+﻿@{
+    ViewData["Title"] = "Контакты";
+}
+
+<style>
+    .contacts-section {
+        padding: 60px 20px;
+        background: #f8f8f8;
+        font-family: Arial, sans-serif;
+    }
+
+    .contacts-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .contacts-header h2 {
+        font-size: 36px;
+        color: #1abc9c;
+        margin-bottom: 10px;
+    }
+
+    .contacts-info {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 30px;
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    .contact-block {
+        background: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.07);
+        padding: 20px 30px;
+        width: 300px;
+        min-height: 150px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }
+
+    .contact-block h4 {
+        color: #1abc9c;
+        font-size: 18px;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+    }
+
+    .contact-block h4 img {
+        max-width: 24px;
+        margin-right: 10px;
+    }
+
+    .contact-block p {
+        color: #444;
+        margin: 4px 0;
+        font-size: 15px;
+    }
+
+    .map-container {
+        margin-top: 40px;
+        max-width: 1000px;
+        margin-left: auto;
+        margin-right: auto;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    }
+
+    .contacts-gallery {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 50px;
+        justify-content: center;
+    }
+
+    .contacts-gallery img {
+        max-width: 300px;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+
+
+        .contacts-info {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .contact-block {
+            width: 90%;
+        }
+
+        .contacts-gallery img {
+            max-width: 90%;
+        }
+    }
+</style>
+
+
+<div class="contacts-section">
+    <div class="contacts-header">
+        <h2>Контакты BeeGroup</h2>
+        <p>Свяжитесь с нами удобным для вас способом</p>
+    </div>
+
+    <div class="contacts-info">
+        <div class="contact-block">
+            <h4><img src="https://img.icons8.com/ios-filled/50/1abc9c/marker.png" /> Адрес</h4>
+            <p>г. Караганда, ул. Ермекова 60, офис 4</p>
+        </div>
+
+        <div class="contact-block">
+            <h4><img src="https://img.icons8.com/ios-filled/50/1abc9c/phone.png" /> Телефон</h4>
+            <p>8 (778) 715 77 34</p>
+            <p>+7 (700) 111 22 33</p>
+        </div>
+
+        <div class="contact-block">
+            <h4><img src="https://img.icons8.com/ios-filled/50/1abc9c/new-post.png" /> Email</h4>
+            <p>info@beegroup.kz</p>
+        </div>
+    </div>
+
+    <div class="map-container">
+        <iframe src="https://yandex.ru/map-widget/v1/?um=constructor%3A8d41d88d3f939462f0e812909b3380b8d1f4372b55bdb9db96f90a61fa8e7d61&amp;source=constructor"
+                width="100%" height="400" frameborder="0">
+        </iframe>
+    </div>
+
+
+</div>

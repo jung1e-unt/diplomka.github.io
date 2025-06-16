@@ -1,0 +1,131 @@
+﻿@model BeeGroup.Models.ProfileViewModel
+
+<div class="container mt-5">
+    <div class="row">
+        <!-- Левая панель профиля -->
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h4 class="text-center mb-4">Профиль пользователя</h4>
+
+                    <div class="mb-3">
+                        <strong>Фамилия:</strong><br />
+                        @Model.Account.LastName
+                    </div>
+
+                    <div class="mb-3">
+                        <strong>Имя:</strong><br />
+                        @Model.Account.FirstName
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Account.MiddleName))
+                    {
+                        <div class="mb-3">
+                            <strong>Отчество:</strong><br />
+                            @Model.Account.MiddleName
+                        </div>
+                    }
+
+                    <div class="mb-3">
+                        <strong>Email:</strong><br />
+                        @Model.Account.MonkeyEmail
+                    </div>
+
+                    @if (!string.IsNullOrEmpty(Model.Account.PhoneNumber))
+                    {
+                        <div class="mb-3">
+                            <strong>Телефон:</strong><br />
+                            @Model.Account.PhoneNumber
+                        </div>
+                    }
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая панель заказов -->
+        <div class="col-md-8">
+            <h3 class="mb-4">Мои заказы</h3>
+            @if (Model.Orders != null && Model.Orders.Any())
+            {
+                <table class="table table-striped">
+                    <thead>
+                        <tr>
+                            <th>Номер заказа</th>
+                            <th>Услуга</th>
+                            <th>Площадь</th>
+                            <th>Цена</th>
+                            <th>Статус</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var order in Model.Orders)
+                        {
+                            var statusClass = order.Status switch
+                            {
+                                "В обработке" => "text-warning",
+                                "Завершен" => "text-success",
+                                "Отменен" => "text-danger",
+                                _ => "text-secondary"
+                            };
+                            <tr>
+                                <td>
+                                    <b>№@order.Id</b><br>
+                                    <span style="color:#888;font-size:13px;">@DateTime.Now.ToString("dd MMMM yyyy")</span>
+                                </td>
+                                <td>@order.ServiceType</td>
+                                <td>@order.ApartmentSize м²</td>
+                                <td>@order.Price ₸</td>
+                                <td>
+                                    <span class="order-status @statusClass">@order.Status</span>
+
+                                    @if (order.Status == "В обработке")
+                                    {
+                                        <button class="btn btn-danger btn-sm cancel-order-btn mt-2" data-order-id="@order.Id">
+                                            Отменить
+                                        </button>
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            }
+            else
+            {
+                <div class="alert alert-info">У вас пока нет заказов.</div>
+            }
+        </div>
+    </div>
+</div>
+<!-- Внизу Profile.cshtml -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        document.querySelectorAll('.cancel-order-btn').forEach(button => {
+            button.addEventListener('click', function () {
+                const orderId = this.dataset.orderId;
+
+                fetch('/api/order/cancel', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ orderId: parseInt(orderId) })
+                })
+                    .then(res => {
+                        if (!res.ok) {
+                            return res.text().then(t => { throw new Error(t); });
+                        }
+                        return res.json();
+                    })
+                    .then(data => {
+                        alert(data.message);
+                        location.reload(); // обновим страницу
+                    })
+                    .catch(err => {
+                        console.error(err);
+                        alert("Ошибка при отмене заказа");
+                    });
+            });
+        });
+    });
+</script>
