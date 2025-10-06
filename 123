@@ -1,10 +1,231 @@
-=ОКРУГЛ(
-(
-(ВРЕМЗНАЧ(ПРАВСИМВ(B2;ДЛСТР(B2)-НАЙТИ("-";B2)))-ВРЕМЗНАЧ(ЛЕВСИМВ(B2;НАЙТИ("-";B2)-1)))
-- (ВРЕМЗНАЧ(ПРАВСИМВ(C2;ДЛСТР(C2)-НАЙТИ("-";C2)))-ВРЕМЗНАЧ(ЛЕВСИМВ(C2;НАЙТИ("-";C2)-1)))
-- (ВРЕМЗНАЧ(ПРАВСИМВ(D2;ДЛСТР(D2)-НАЙТИ("-";D2)))-ВРЕМЗНАЧ(ЛЕВСИМВ(D2;НАЙТИ("-";D2)-1)))
-) / (
-(ВРЕМЗНАЧ(ПРАВСИМВ(B2;ДЛСТР(B2)-НАЙТИ("-";B2)))-ВРЕМЗНАЧ(ЛЕВСИМВ(B2;НАЙТИ("-";B2)-1)))
-- (ВРЕМЗНАЧ(ПРАВСИМВ(C2;ДЛСТР(C2)-НАЙТИ("-";C2)))-ВРЕМЗНАЧ(ЛЕВСИМВ(C2;НАЙТИ("-";C2)-1)))
-)
-;2)
+const modal_passw = document.getElementById("passwordModal_admin");
+const openBtn = document.getElementById("parol");
+const closeBtn = document.querySelector(".close");
+const cancelBtn = document.getElementById("cancelBtn");
+    openBtn.onclick = () => modal_passw.style.display = "block";
+    closeBtn.onclick = () => modal_passw.style.display = "none";
+    cancelBtn.onclick = () => modal_passw.style.display = "none";
+document.addEventListener("DOMContentLoaded", function () {
+    const saveBtn = document.getElementById("savePasswordBtn");
+    const newPassword = document.getElementById("newPassword");
+    const confirmPassword = document.getElementById("confirmPassword");
+    const oldPassword = document.getElementById("oldPassword");
+    const tabelNum = document.getElementById("tabelNum");
+    const errorMessage = document.getElementById("errorMessage");
+
+    const role = document.body.getAttribute("data-role");
+
+    if (role !== "admin") {
+        tabelNum.setAttribute("readonly", true);
+    }
+
+    saveBtn.addEventListener("click", function (e) {
+        e.preventDefault();
+
+        const newVal = newPassword.value.trim();
+        const confirmVal = confirmPassword.value.trim();
+        const tabelVal = tabelNum.value.trim();
+
+        if (!newVal || !confirmVal) {
+            errorMessage.textContent = "Заполните все поля";
+            errorMessage.style.display = "block";
+            return;
+        }
+
+        if (newVal !== confirmVal) {
+            errorMessage.textContent = "Пароли не совпадают";
+            errorMessage.style.display = "block";
+            return;
+        }
+
+        errorMessage.style.display = "none";
+        const url = "@Url.Action("ChangePass", "Home")";
+        fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                tabelNum: tabelVal,
+                newPassword: newVal
+            })
+        })
+        .then(async response => {
+            const data = await response.json();
+            if (!response.ok || !data.success) {
+                throw new Error(data.message || "Неизвестная ошибка");
+            }
+            alert(data.message);
+            document.getElementById("passwordModal_admin").style.display = "none";
+        })
+        .catch(error => {
+            errorMessage.textContent = error.message;
+            errorMessage.style.display = "block";
+        });
+    });
+
+    confirmPassword.addEventListener("input", function () {
+        if (newPassword.value.trim() === confirmPassword.value.trim()) {
+            errorMessage.style.display = "none";
+        }
+    });
+});
+
+
+
+
+
+
+        public IActionResult ChangePass([FromBody] ChangePass model)
+        {
+            try
+            {
+                Users users = new Users();
+                string par = "SELECT pass_user FROM sl_users_master WHERE user_id = :TabelNum";
+
+                using (OracleCommand com_pas = new OracleCommand(par, con))
+                {
+                    com_pas.Parameters.Add(new OracleParameter("TabelNum", OracleDbType.Varchar2)).Value = model.TabelNum;
+                    con.Open();
+
+                    string oldPass_fromDB = Convert.ToString(com_pas.ExecuteScalar());
+
+                    // Шифровка нового пароля
+                    string new_pass = model.NewPassword;
+                    string new_pass_after = "";
+                    for (int i = 0; i < new_pass.Length; i++)
+                    {
+                        char currentChar = new_pass[i];
+                        char modifiedChar = (char)(currentChar + (i + 1));
+                        new_pass_after += modifiedChar;
+                    }
+
+                    // Обновление пароля
+                    string updateQuery = @"UPDATE sl_users_master SET pass_user = :NewPassword WHERE user_id = :TabelNum";
+                    using (OracleCommand command = new OracleCommand(updateQuery, con))
+                    {
+                        command.Parameters.Add(new OracleParameter("NewPassword", OracleDbType.Varchar2)).Value = new_pass_after;
+                        command.Parameters.Add(new OracleParameter("TabelNum", OracleDbType.Varchar2)).Value = model.TabelNum;
+
+                        int rowsAffected = command.ExecuteNonQuery();
+
+                        if (rowsAffected > 0)
+                        {
+                            // Получение данных пользователя для логирования
+                            string select_for_logs = @"SELECT * FROM SL_USERS_MASTER WHERE USER_ID = :TabelNum";
+                            using (OracleCommand command_log_select = new OracleCommand(select_for_logs, con))
+                            {
+                                command_log_select.Parameters.Add(new OracleParameter("TabelNum", OracleDbType.Varchar2)).Value = model.TabelNum;
+
+                                using (OracleDataReader reader = command_log_select.ExecuteReader())
+                                {
+                                    if (reader.Read())
+                                    {
+                                        users.USER_ID = reader["USER_ID"].ToString();
+                                        users.SHOP_ID = reader["SHOP_ID"].ToString();
+                                        users.OTD_ID = reader["OTD_ID"].ToString();
+                                        users.PLACENO_ID = reader["PLACENO_ID"].ToString();
+                                        users.FIRST_NAME = reader["FIRST_NAME"].ToString();
+                                        users.PATRONYMIC = reader["PATRONYMIC"].ToString();
+                                        users.LAST_NAME = reader["LAST_NAME"].ToString();
+                                        users.TYPE_LEVEL = reader["TYPE_LEVEL"].ToString();
+                                        users.STATUS_ID = reader["STATUS_ID"].ToString();
+                                        users.STATUS_PC = reader["STATUS_PC"].ToString();
+                                        users.CREATED_DATE = reader["CREATED_DATE"].ToString();
+                                        users.CREATED_BY = reader["CREATED_BY"].ToString();
+                                    }
+                                }
+                            }
+
+                            // Вставка в лог
+                            string insertLog = @"
+                    INSERT INTO SL_USERS_MASTER_LOG (
+                        USER_ID, SHOPE_ID, OTD_ID, PLACENO_ID, FIRST_NAME, PATRONYMIC, LAST_NAME,
+                        PASS_USER, TYP_LEVEL, STAT_PC, CREATED_BY, CREATED_DATE, UPDATED_BY, UPDATED_DATE
+                    ) VALUES (
+                        :USER_ID, :SHOPE_ID, :OTD_ID, :PLACENO_ID, :FIRST_NAME, :PATRONYMIC, :LAST_NAME,
+                        :PASS_USER, :TYP_LEVEL, :STAT_PC, :CREATED_BY, :CREATED_DATE, :UPDATED_BY, SYSDATE
+                    )";
+
+                            using (OracleCommand command_log_insert = new OracleCommand(insertLog, con))
+                            {
+                                DateTime.TryParse(users.CREATED_DATE, out DateTime createdDate);
+
+                                command_log_insert.Parameters.Add(new OracleParameter("USER_ID", OracleDbType.Varchar2)).Value = users.USER_ID;
+                                command_log_insert.Parameters.Add(new OracleParameter("SHOPE_ID", OracleDbType.Varchar2)).Value = users.SHOP_ID;
+                                command_log_insert.Parameters.Add(new OracleParameter("OTD_ID", OracleDbType.Varchar2)).Value = users.OTD_ID;
+                                command_log_insert.Parameters.Add(new OracleParameter("PLACENO_ID", OracleDbType.Varchar2)).Value = users.PLACENO_ID;
+                                command_log_insert.Parameters.Add(new OracleParameter("FIRST_NAME", OracleDbType.Varchar2)).Value = users.FIRST_NAME;
+                                command_log_insert.Parameters.Add(new OracleParameter("PATRONYMIC", OracleDbType.Varchar2)).Value = users.PATRONYMIC;
+                                command_log_insert.Parameters.Add(new OracleParameter("LAST_NAME", OracleDbType.Varchar2)).Value = users.LAST_NAME;
+                                command_log_insert.Parameters.Add(new OracleParameter("PASS_USER", OracleDbType.Varchar2)).Value = new_pass_after;
+                                command_log_insert.Parameters.Add(new OracleParameter("TYP_LEVEL", OracleDbType.Varchar2)).Value = users.TYPE_LEVEL;
+                                command_log_insert.Parameters.Add(new OracleParameter("STAT_PC", OracleDbType.Varchar2)).Value = users.STATUS_PC;
+                                command_log_insert.Parameters.Add(new OracleParameter("CREATED_BY", OracleDbType.Varchar2)).Value = users.CREATED_BY;
+                                command_log_insert.Parameters.Add(new OracleParameter("CREATED_DATE", OracleDbType.Date)).Value = createdDate;
+                                command_log_insert.Parameters.Add(new OracleParameter("UPDATED_BY", OracleDbType.Varchar2)).Value = model.TabelNum;
+
+                                command_log_insert.ExecuteNonQuery();
+                            }
+
+                            return Ok(new { success = true, message = "✅ Пароль успешно изменен." });
+                        }
+                        else
+                        {
+                            return BadRequest(new { success = false, message = "❌ Не удалось изменить пароль." });
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { success = false, message = $"Ошибка: {ex.Message}" });
+            }
+            finally
+            {
+                if (con.State == ConnectionState.Open)
+                    con.Close();
+            }
+
+            return PartialView("Privacy");
+        }
+
+
+<div id="passwordModal_admin" class="modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="changePasswordForm">
+                <h3>Смена пароля</h3>
+
+                <input id="tabelNum" value="@ViewBag.Tabel" style="display: none;" /><br>
+
+                <div class="labelpass">
+                    <label class="labelpasslabel">Новый пароль</label>
+                    <input class="labelpassinput" type="password" id="newPassword" /><br>
+                    <label class="labelpasslabel">Подтвердите новый пароль</label>
+                    <input class="labelpassinput" type="password" id="confirmPassword" /><br>
+                </div>
+                <style>
+                    .labelpass {
+                        text-align: center;
+                        line-height: 25px;
+                    }
+
+                    }
+
+                    .labelpass label {
+                        align-self: center;
+                    }
+
+                    .labelpass input {
+                        float: inline-end;
+                    }
+                </style>
+
+                <p id="errorMessage" style="color: red; display: none;">Пароли не совпадают</p>
+
+                <button type="submit" id="savePasswordBtn">Сохранить</button>
+            </form>
+            <button id="cancelBtn">Отмена</button>
+        </div>
+    </div>
