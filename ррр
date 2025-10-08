@@ -1,4 +1,148 @@
-                                return Json(new { success = false, message = "Ошибка вставки в лог: " + ex.Message });
+<style>
+    #customAlertOverlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.6);
+        z-index: 9999;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .customAlertBox {
+        background-color: #fff;
+        color: #333;
+        padding: 30px;
+        border-radius: 10px;
+        text-align: center;
+        box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        width: 600px;
+        height: 200px;
+        font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+
+    .customAlertCloseButton {
+        margin-top: 20px;
+        padding: 10px 20px;
+        background-color: #007bff;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+    }
+
+    .customAlertCloseButton:hover {
+        background-color: #0056b3;
+    }
+</style>
+
+<div id="customAlertOverlay">
+    <div class="customAlertBox">
+        <div id="customAlertMessage"></div>
+        <button class="customAlertCloseButton" onclick="closeCustomAlert()">OK</button>
+    </div>
+</div>
+
+<script>
+    // === Кастомное окно ===
+    function showCustomAlert(message) {
+        document.getElementById("customAlertMessage").textContent = message;
+        document.getElementById("customAlertOverlay").style.display = "flex";
+    }
+
+    function closeCustomAlert() {
+        document.getElementById("customAlertOverlay").style.display = "none";
+    }
+
+    // === Основной код ===
+    document.getElementById("reg_user").addEventListener("click", async function (e) {
+        e.preventDefault();
+
+        const checkUrl = "@Url.Action('Check_in_db', 'Home')";
+        const registrationUrl = "@Url.Action('Registration', 'Home')";
+        const updateUrl = "@Url.Action('Update_user', 'Home')";
+
+        const user = {
+            USER_ID: document.getElementById("USER_ID").value,
+            LAST_NAME: document.getElementById("LAST_NAME").value,
+            FIRST_NAME: document.getElementById("FIRST_NAME").value,
+            PATRONYMIC: document.getElementById("PATRONYMIC").value,
+            PASS_USER: document.getElementById("PASS_USER").value,
+            CONFIRM_PASS: document.getElementById("PASSWORD_RE").value,
+            TYPE_LEVEL: document.getElementById("TYPE_LEVEL").value,
+            SHOP_ID: document.getElementById("SHOP_ID").value,
+            OTD_ID: document.getElementById("OTD_ID").value,
+            STATUS_PC: document.getElementById("STATUS_PC").value,
+            STATUS_ID: document.getElementById("STATUS_ID").value,
+            N_OTK: document.getElementById("N_OTK").value
+        };
+
+        try {
+            // 1️⃣ Проверка — есть ли пользователь
+            const checkResponse = await fetch(checkUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            });
+
+            if (!checkResponse.ok) {
+                throw new Error("Ошибка при проверке пользователя");
+            }
+
+            const checkResult = await checkResponse.json();
+            const isUpdate = checkResult.exists === true;
+
+            // 2️⃣ Проверка паролей (только при регистрации)
+            if (!isUpdate) {
+                if (!user.PASS_USER || !user.CONFIRM_PASS) {
+                    showCustomAlert("Введите пароль и подтверждение пароля");
+                    return;
+                } else if (user.PASS_USER !== user.CONFIRM_PASS) {
+                    showCustomAlert("Пароли не совпадают");
+                    return;
+                }
+            }
+
+            // 3️⃣ Отправляем данные на сервер
+            const targetUrl = isUpdate ? updateUrl : registrationUrl;
+
+            const saveResponse = await fetch(targetUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(user)
+            });
+
+            if (!saveResponse.ok) {
+                throw new Error("Ошибка при сохранении данных");
+            }
+
+            const result = await saveResponse.json();
+
+            showCustomAlert(result.message);
+
+            if (result.success) {
+                clearFormInputs();
+            }
+
+        } catch (error) {
+            console.error("Ошибка:", error);
+            showCustomAlert("Ошибка при обработке запроса: " + error.message);
+        }
+    });
+
+    function clearFormInputs() {
+        document.querySelectorAll("input").forEach(el => el.value = "");
+        document.querySelectorAll("select").forEach(el => el.selectedIndex = 0);
+    }
+</script>
+.....                                return Json(new { success = false, message = "Ошибка вставки в лог: " + ex.Message });
                             }
                             return Json(new { success = true, message = "Информация обновлена" });
                         }
