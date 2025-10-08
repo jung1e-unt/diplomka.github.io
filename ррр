@@ -1,4 +1,54 @@
+<!-- 🔹 Модальное окно смены пароля -->
+<div id="passwordModal_admin" class="modal">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="changePasswordForm">
+                <h3>Смена пароля</h3>
+
+                <input id="tabelNum" value="@ViewBag.Tabel" style="display: none;" /><br>
+
+                <div class="labelpass">
+                    <label class="labelpasslabel">Новый пароль</label>
+                    <input class="labelpassinput" type="password" id="newPassword" /><br>
+                    <label class="labelpasslabel">Подтвердите новый пароль</label>
+                    <input class="labelpassinput" type="password" id="confirmPassword" /><br>
+                </div>
+
+                <p id="errorMessage" style="color: red; display: none;">Пароли не совпадают</p>
+
+                <button type="submit" id="savePasswordBtn">Сохранить</button>
+            </form>
+            <button id="cancelBtn">Отмена</button>
+        </div>
+    </div>
+</div>
+
+<!-- 🔹 Модальное окно уведомлений -->
+<div id="customAlertOverlay">
+    <div class="customAlertBox">
+        <div id="customAlertIcon" style="font-size: 48px; margin-bottom: 10px;">ℹ️</div>
+        <h3 id="customAlertTitle">Сообщение</h3>
+        <p id="customAlertMessage"></p>
+        <button class="customAlertCloseButton" id="customAlertCloseButton">ОК</button>
+    </div>
+</div>
+
+<!-- 🔹 Стили -->
 <style>
+    .labelpass {
+        text-align: center;
+        line-height: 25px;
+    }
+
+    .labelpass label {
+        align-self: center;
+    }
+
+    .labelpass input {
+        float: inline-end;
+    }
+
+    /* 🔹 Твои стили для кастомного алерта */
     #customAlertOverlay {
         display: none;
         position: fixed;
@@ -19,10 +69,14 @@
         border-radius: 10px;
         text-align: center;
         box-shadow: 0 0 20px rgba(0,0,0,0.5);
-        /* max-width: 400px; */
         width: 600px;
         height: 200px;
         font-family: sans-serif;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        animation: fadeIn 0.3s ease;
     }
 
     .customAlertCloseButton {
@@ -35,23 +89,124 @@
         cursor: pointer;
     }
 
-        .customAlertCloseButton:hover {
-            background-color: #0056b3;
-        }
-
-    .customSaveButton,
-    .customDeleteButton {
-        background: none;
-        border: none;
-        cursor: pointer;
+    .customAlertCloseButton:hover {
+        background-color: #0056b3;
     }
 
-    .customSaveIcon,
-    .customDeleteIcon {
-        width: 24px;
-        height: 24px;
+    @keyframes fadeIn {
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
     }
 </style>
+
+<!-- 🔹 Скрипт -->
+<script>
+    const modal_passw = document.getElementById("passwordModal_admin");
+    const openBtn = document.getElementById("parol");
+    const closeBtn = document.querySelector(".close");
+    const cancelBtn = document.getElementById("cancelBtn");
+
+    if (openBtn) openBtn.onclick = () => modal_passw.style.display = "block";
+    if (closeBtn) closeBtn.onclick = () => modal_passw.style.display = "none";
+    cancelBtn.onclick = () => modal_passw.style.display = "none";
+
+    // ✅ Функция для показа красивого модального уведомления
+    function showCustomAlert(type, message, callback) {
+        const overlay = document.getElementById("customAlertOverlay");
+        const title = document.getElementById("customAlertTitle");
+        const text = document.getElementById("customAlertMessage");
+        const icon = document.getElementById("customAlertIcon");
+        const closeBtn = document.getElementById("customAlertCloseButton");
+
+        // Настраиваем в зависимости от типа
+        if (type === "success") {
+            title.textContent = "Успешно";
+            icon.textContent = "✅";
+            title.style.color = "#28a745";
+        } else if (type === "error") {
+            title.textContent = "Ошибка";
+            icon.textContent = "❌";
+            title.style.color = "#dc3545";
+        } else {
+            title.textContent = "Сообщение";
+            icon.textContent = "ℹ️";
+            title.style.color = "#333";
+        }
+
+        text.textContent = message;
+        overlay.style.display = "flex";
+
+        // Закрытие по кнопке
+        closeBtn.onclick = () => {
+            overlay.style.display = "none";
+            if (callback) callback();
+        };
+    }
+
+    document.addEventListener("DOMContentLoaded", function () {
+        const saveBtn = document.getElementById("savePasswordBtn");
+        const newPassword = document.getElementById("newPassword");
+        const confirmPassword = document.getElementById("confirmPassword");
+        const tabelNum = document.getElementById("tabelNum");
+        const errorMessage = document.getElementById("errorMessage");
+        const role = document.body.getAttribute("data-role");
+
+        if (role !== "admin") {
+            tabelNum.setAttribute("readonly", true);
+        }
+
+        saveBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+
+            const newVal = newPassword.value.trim();
+            const confirmVal = confirmPassword.value.trim();
+            const tabelVal = tabelNum.value.trim();
+
+            if (!newVal || !confirmVal) {
+                showCustomAlert("error", "Заполните все поля");
+                return;
+            }
+
+            if (newVal !== confirmVal) {
+                showCustomAlert("error", "Пароли не совпадают");
+                return;
+            }
+
+            const url = "@Url.Action('ChangePass', 'Home')";
+            fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    tabelNum: tabelVal,
+                    newPassword: newVal
+                })
+            })
+            .then(async response => {
+                const data = await response.json();
+                if (!response.ok || !data.success) {
+                    throw new Error(data.message || "Неизвестная ошибка");
+                }
+
+                showCustomAlert("success", data.message, () => {
+                    modal_passw.style.display = "none";
+                });
+            })
+            .catch(error => {
+                showCustomAlert("error", error.message);
+            });
+        });
+
+        confirmPassword.addEventListener("input", function () {
+            if (newPassword.value.trim() === confirmPassword.value.trim()) {
+                errorMessage.style.display = "none";
+            }
+        });
+    });
+</script>
+
+.....
 
 
 
