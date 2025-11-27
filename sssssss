@@ -1,0 +1,180 @@
+Dbservice
+using System.Data;
+using System.Data.SqlClient;
+using Dapper;
+
+namespace YourApp.Services
+{
+    public class DbService
+    {
+        private readonly string _conn;
+
+        public DbService(IConfiguration config)
+        {
+            _conn = config.GetConnectionString("DefaultConnection");
+        }
+
+        // Метод для получения данных из любой таблицы
+        public DataTable GetTable(string tableName, string? orderBy, string? dateFrom, string? dateTo)
+        {
+            using var conn = new SqlConnection(_conn);
+
+            // Собираем SQL вручную
+            var sql = $"SELECT schet, data, kolich FROM {tableName} WHERE 1 = 1";
+
+            // Фильтр по датам, если заданы
+            if (!string.IsNullOrEmpty(dateFrom))
+                sql += " AND data >= @df";
+
+            if (!string.IsNullOrEmpty(dateTo))
+                sql += " AND data <= @dt";
+
+            // Сортировка, если выбрали колонку
+            if (!string.IsNullOrEmpty(orderBy))
+                sql += $" ORDER BY {orderBy}";
+
+            var reader = conn.ExecuteReader(sql, new
+            {
+                df = dateFrom,
+                dt = dateTo
+            });
+
+            var dt = new DataTable();
+            dt.Load(reader);
+
+            return dt;
+        }
+    }
+}
+
+
+
+Homecontroller 
+using Microsoft.AspNetCore.Mvc;
+using YourApp.Services;
+using System.Data;
+
+namespace YourApp.Controllers
+{
+    public class HomeController : Controller
+    {
+        private readonly DbService _db;
+
+        public HomeController(DbService db)
+        {
+            _db = db;
+        }
+
+        public IActionResult Index(
+            string? tableName,
+            string? sortColumn,
+            string? sortDir,
+            string? dateFrom,
+            string? dateTo)
+        {
+            // Список таблиц (слева)
+            var tables = new List<string> { "testkir", "testkir1" };
+
+            // Если таблица не выбрана — выбираем первую
+            tableName ??= tables.First();
+
+            // Формируем ORDER BY data ASC/DESC
+            string? order = null;
+            if (!string.IsNullOrEmpty(sortColumn))
+                order = $"{sortColumn} {sortDir}";
+
+            // Получаем данные
+            DataTable dt = _db.GetTable(tableName, order, dateFrom, dateTo);
+
+            ViewBag.Tables = tables;
+            ViewBag.Selected = tableName;
+            ViewBag.SortColumn = sortColumn;
+            ViewBag.SortDir = sortDir;
+            ViewBag.DateFrom = dateFrom;
+            ViewBag.DateTo = dateTo;
+
+            return View(dt);
+        }
+    }
+}
+
+
+index.cshtml
+@using System.Data;
+@model DataTable
+
+<div style="display:flex; gap:20px;">
+
+    <!-- ЛЕВОЕ МЕНЮ — список таблиц -->
+    <div style="width:200px; border-right:1px solid #ddd;">
+        <h4>Таблицы</h4>
+
+        <!-- Список таблиц -->
+        @foreach (var t in (List<string>)ViewBag.Tables)
+        {
+            <div>
+                <a href="/Home/Index?tableName=@t"
+                   style="color:@(t == ViewBag.Selected ? "red" : "blue")">
+                    @t
+                </a>
+            </div>
+        }
+    </div>
+
+
+    <!-- ПРАВАЯ ЧАСТЬ — данные -->
+    <div style="flex:1;">
+
+        <!-- Фильтрация по дате -->
+        <form method="get">
+            <input type="hidden" name="tableName" value="@ViewBag.Selected" />
+
+            <label>Дата с: </label>
+            <input type="date" name="dateFrom" value="@ViewBag.DateFrom" />
+
+            <label>Дата по: </label>
+            <input type="date" name="dateTo" value="@ViewBag.DateTo" />
+
+            <button type="submit">Фильтр</button>
+        </form>
+
+        <br />
+
+        <!-- Таблица -->
+        <table border="1" cellpadding="5">
+            <thead>
+                <tr>
+                    @{
+                        // Метод для формирования ссылки сортировки
+                        Func<string, string> sortLink = col =>
+                        {
+                            string newDir =
+                                (ViewBag.SortColumn == col && ViewBag.SortDir == "ASC")
+                                ? "DESC"
+                                : "ASC";
+
+                            return $"/Home/Index?tableName={ViewBag.Selected}&sortColumn={col}&sortDir={newDir}&dateFrom={ViewBag.DateFrom}&dateTo={ViewBag.DateTo}";
+                        };
+                    }
+
+                    <!-- Заголовки — кликабельные (как в Oracle SQL) -->
+                    <th><a href="@sortLink("schet")">schet</a></th>
+                    <th><a href="@sortLink("data")">data</a></th>
+                    <th><a href="@sortLink("kolich")">kolich</a></th>
+                </tr>
+            </thead>
+
+            <tbody>
+                @foreach (DataRow row in Model.Rows)
+                {
+                    <tr>
+                        <td>@row["schet"]</td>
+                        <td>@row["data"]</td>
+                        <td>@row["kolich"]</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+</div>
