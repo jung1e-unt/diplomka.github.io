@@ -214,3 +214,64 @@ public class IndexModel : PageModel
         }
     }
 }
+
+
+
+
+private static DataTable ToDataTable(OracleDataReader reader)
+{
+    var dt = new DataTable();
+    var schema = reader.GetColumnSchema();
+
+    foreach (var col in schema)
+    {
+        // ВСЕ даты будут храниться как текст — полностью безопасно
+        if ((col.DataTypeName ?? "").ToUpperInvariant().Contains("DATE") ||
+            (col.DataTypeName ?? "").ToUpperInvariant().Contains("TIMESTAMP"))
+        {
+            dt.Columns.Add(col.ColumnName, typeof(string));
+        }
+        else
+        {
+            var type = col.DataType ?? typeof(string);
+            dt.Columns.Add(col.ColumnName, type);
+        }
+    }
+
+    while (reader.Read())
+    {
+        var row = dt.NewRow();
+
+        for (int i = 0; i < dt.Columns.Count; i++)
+        {
+            var col = dt.Columns[i];
+
+            if (reader.IsDBNull(i))
+            {
+                row[i] = DBNull.Value;
+                continue;
+            }
+
+            // Дата → строка
+            if (col.DataType == typeof(string) &&
+                ((schema[i].DataTypeName ?? "").ToUpperInvariant().Contains("DATE") ||
+                 (schema[i].DataTypeName ?? "").ToUpperInvariant().Contains("TIMESTAMP")))
+            {
+                var dtValue = reader.GetValue(i);
+
+                if (dtValue is DateTime dtParsed)
+                    row[i] = dtParsed.ToString("dd.MM.yy");
+                else
+                    row[i] = dtValue?.ToString(); // если VARCHAR с датой
+            }
+            else
+            {
+                row[i] = reader.GetValue(i);
+            }
+        }
+
+        dt.Rows.Add(row);
+    }
+
+    return dt;
+}
