@@ -1,180 +1,216 @@
-Dbservice
-using System.Data;
-using System.Data.SqlClient;
-using Dapper;
 
-namespace YourApp.Services
-{
-    public class DbService
-    {
-        private readonly string _conn;
-
-        public DbService(IConfiguration config)
-        {
-            _conn = config.GetConnectionString("DefaultConnection");
-        }
-
-        // Метод для получения данных из любой таблицы
-        public DataTable GetTable(string tableName, string? orderBy, string? dateFrom, string? dateTo)
-        {
-            using var conn = new SqlConnection(_conn);
-
-            // Собираем SQL вручную
-            var sql = $"SELECT schet, data, kolich FROM {tableName} WHERE 1 = 1";
-
-            // Фильтр по датам, если заданы
-            if (!string.IsNullOrEmpty(dateFrom))
-                sql += " AND data >= @df";
-
-            if (!string.IsNullOrEmpty(dateTo))
-                sql += " AND data <= @dt";
-
-            // Сортировка, если выбрали колонку
-            if (!string.IsNullOrEmpty(orderBy))
-                sql += $" ORDER BY {orderBy}";
-
-            var reader = conn.ExecuteReader(sql, new
-            {
-                df = dateFrom,
-                dt = dateTo
-            });
-
-            var dt = new DataTable();
-            dt.Load(reader);
-
-            return dt;
-        }
-    }
-}
-
-
-
-Homecontroller 
+using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
-using YourApp.Services;
+using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.Extensions.Configuration;
+using Oracle.ManagedDataAccess.Client;
+using System;
+using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 
-namespace YourApp.Controllers
+public class IndexModel : PageModel
 {
-    public class HomeController : Controller
-    {
-        private readonly DbService _db;
+    private readonly IConfiguration _config;
 
-        public HomeController(DbService db)
+    public IndexModel(IConfiguration config)
+    {
+        _config = config;
+    }
+
+    private static readonly HashSet<string> AllowedTables = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "ANGA_OTK","AUO_OPXR","BMC_1_2","DATACENTR","DATACENTR_OLD","EXCEL3","GEST","JA_1","JA_2","JASH_1",
+        "JASH_1_DUBL","JASH_2","JASH_2_DUBL","LAB_LNPP","LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE","LPC3_MM",
+        "MEX_CGCA","MEX_CGCA_LOG","MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG","MEX_LPC2","MEX_LPC2_LOG",
+        "MEX_LPC3","MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG","MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG","MICRO_CGCA",
+        "MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3","NDC_DUBLE_LNPP","NDC_LNPP","OTGR_CGCA","OTGR_CGCA_NEW",
+        "OTGR_CGCA_OLD","OTK","PROD_LNPP","PROD_LNPP_OLD","PROIZ_LPC3","PROИЗV_ANGA","PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA",
+        "PROIZV_LKPP_OLD","PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV","PROIZV_LNPP","PROIZV_LNPP_OLD","PROIZV_LNPP_PROD_NEW",
+        "PROIZV_LNPP_PRODUCTIV","PROKAT_SMAZ","PRPROKAT_CEXA","RASTVOR_LNPP","RASTVOR_OPXR2","TEMP_NDC_020147","TEMP_NDC_NNN",
+        "VOZV_OTGR","XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2","XIMMUL_LPC2","XIMNTA_LPC2","XIMVXKONTR_LPC3",
+        "XIMXROM_LPC3"
+    };
+
+    private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    public IActionResult OnGetData(string table)
+    {
+        if (string.IsNullOrWhiteSpace(table))
+            return new JsonResult(new { error = "Table is required." }) { StatusCode = 400 };
+
+        var tableUpper = table.Trim().ToUpperInvariant();
+        if (!AllowedTables.Contains(tableUpper))
+            return new JsonResult(new { error = "Table is not allowed." }) { StatusCode = 400 };
+
+        var connString = _config.GetConnectionString("OracleConnection");
+        using var conn = new OracleConnection(connString);
+        conn.Open();
+
+        var sql = BuildSql(tableUpper);
+        using var cmd = new OracleCommand(sql, conn);
+
+        try
         {
-            _db = db;
+            using var reader = cmd.ExecuteReader();
+
+            var rows = new List<Dictionary<string, object?>>();
+            var schema = reader.GetColumnSchema();
+
+            while (reader.Read())
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+
+                foreach (var col in schema)
+                {
+                    var raw = reader[col.ColumnName];
+
+                    if (raw == DBNull.Value)
+                        row[col.ColumnName] = null;
+                    else if (raw is DateTime dt)
+                        row[col.ColumnName] = dt.ToString("dd.MM.yy"); 
+                    else
+                        row[col.ColumnName] = raw;
+                }
+
+                rows.Add(row);
+            }
+
+            return new JsonResult(rows, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = null,
+                WriteIndented = false
+            });
+        }
+        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        {
+            return new JsonResult(Array.Empty<object>(), new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = null,
+                WriteIndented = false
+            });
+        }
+    }
+
+    public IActionResult OnGetExport(string table)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(table))
+                return BadRequest("Table is required.");
+
+            var tableUpper = table.Trim().ToUpperInvariant();
+            if (!AllowedTables.Contains(tableUpper))
+                return BadRequest("Table is not allowed.");
+
+            var connString = _config.GetConnectionString("OracleConnection");
+            using var conn = new OracleConnection(connString);
+            conn.Open();
+
+            var sql = BuildSql(tableUpper);
+            using var cmd = new OracleCommand(sql, conn);
+            using var reader = cmd.ExecuteReader();
+
+            var dt = ToDataTable(reader);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add(dt, tableUpper); 
+
+            var tbl = ws.Tables.FirstOrDefault();
+            if (tbl != null)
+            {
+                tbl.ShowAutoFilter = true;
+                // tbl.Theme = XLTableTheme.TableStyleLight9; // при желании
+            }
+
+            ws.SheetView.FreezeRows(1);
+            ApplyDateColumnFormats(ws, dt);
+            ws.Columns().AdjustToContents();
+
+            byte[] bytes;
+            using (var ms = new MemoryStream())
+            {
+                wb.SaveAs(ms);
+                bytes = ms.ToArray();
+            }
+
+            var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
+            return File(bytes, ContentTypeXlsx, fileName);
+        }
+        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        {
+            using var wbEmpty = new XLWorkbook();
+            var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
+            wsEmpty.Cell(1, 1).Value = "Нет данных из-за ORA-8180/8181 (SCN/TIMESTAMP)";
+            wsEmpty.Columns().AdjustToContents();
+
+            byte[] emptyBytes;
+            using (var msEmpty = new MemoryStream())
+            {
+                wbEmpty.SaveAs(msEmpty);
+                emptyBytes = msEmpty.ToArray();
+            }
+
+            return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
+        }
+    }
+
+    private static string BuildSql(string tableUpper) => $@"
+        SELECT *
+        FROM {tableUpper}
+        FETCH FIRST 100 ROWS ONLY";
+
+    private static DataTable ToDataTable(OracleDataReader reader)
+    {
+        var dt = new DataTable();
+        var schema = reader.GetColumnSchema();
+
+        foreach (var col in schema)
+        {
+            var type = col.DataType ?? typeof(string);
+            if (type == typeof(object) && !string.IsNullOrEmpty(col.DataTypeName))
+            {
+                var name = col.DataTypeName.ToUpperInvariant();
+                if (name.Contains("DATE") || name.Contains("TIMESTAMP"))
+                    type = typeof(DateTime);
+                else if (name.Contains("NUMBER"))
+                    type = typeof(decimal);
+                else if (name.Contains("FLOAT") || name.Contains("BINARY_FLOAT") || name.Contains("BINARY_DOUBLE"))
+                    type = typeof(double);
+            }
+
+            dt.Columns.Add(col.ColumnName, type);
         }
 
-        public IActionResult Index(
-            string? tableName,
-            string? sortColumn,
-            string? sortDir,
-            string? dateFrom,
-            string? dateTo)
+        while (reader.Read())
         {
-            // Список таблиц (слева)
-            var tables = new List<string> { "testkir", "testkir1" };
+            var row = dt.NewRow();
+            for (int i = 0; i < dt.Columns.Count; i++)
+            {
+                row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
+            }
+            dt.Rows.Add(row);
+        }
 
-            // Если таблица не выбрана — выбираем первую
-            tableName ??= tables.First();
+        return dt;
+    }
 
-            // Формируем ORDER BY data ASC/DESC
-            string? order = null;
-            if (!string.IsNullOrEmpty(sortColumn))
-                order = $"{sortColumn} {sortDir}";
-
-            // Получаем данные
-            DataTable dt = _db.GetTable(tableName, order, dateFrom, dateTo);
-
-            ViewBag.Tables = tables;
-            ViewBag.Selected = tableName;
-            ViewBag.SortColumn = sortColumn;
-            ViewBag.SortDir = sortDir;
-            ViewBag.DateFrom = dateFrom;
-            ViewBag.DateTo = dateTo;
-
-            return View(dt);
+    private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt)
+    {
+        for (int i = 0; i < dt.Columns.Count; i++)
+        {
+            var col = dt.Columns[i];
+            if (col.DataType == typeof(DateTime))
+            {
+                ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yy";
+            }
         }
     }
 }
-
-
-index.cshtml
-@using System.Data;
-@model DataTable
-
-<div style="display:flex; gap:20px;">
-
-    <!-- ЛЕВОЕ МЕНЮ — список таблиц -->
-    <div style="width:200px; border-right:1px solid #ddd;">
-        <h4>Таблицы</h4>
-
-        <!-- Список таблиц -->
-        @foreach (var t in (List<string>)ViewBag.Tables)
-        {
-            <div>
-                <a href="/Home/Index?tableName=@t"
-                   style="color:@(t == ViewBag.Selected ? "red" : "blue")">
-                    @t
-                </a>
-            </div>
-        }
-    </div>
-
-
-    <!-- ПРАВАЯ ЧАСТЬ — данные -->
-    <div style="flex:1;">
-
-        <!-- Фильтрация по дате -->
-        <form method="get">
-            <input type="hidden" name="tableName" value="@ViewBag.Selected" />
-
-            <label>Дата с: </label>
-            <input type="date" name="dateFrom" value="@ViewBag.DateFrom" />
-
-            <label>Дата по: </label>
-            <input type="date" name="dateTo" value="@ViewBag.DateTo" />
-
-            <button type="submit">Фильтр</button>
-        </form>
-
-        <br />
-
-        <!-- Таблица -->
-        <table border="1" cellpadding="5">
-            <thead>
-                <tr>
-                    @{
-                        // Метод для формирования ссылки сортировки
-                        Func<string, string> sortLink = col =>
-                        {
-                            string newDir =
-                                (ViewBag.SortColumn == col && ViewBag.SortDir == "ASC")
-                                ? "DESC"
-                                : "ASC";
-
-                            return $"/Home/Index?tableName={ViewBag.Selected}&sortColumn={col}&sortDir={newDir}&dateFrom={ViewBag.DateFrom}&dateTo={ViewBag.DateTo}";
-                        };
-                    }
-
-                    <!-- Заголовки — кликабельные (как в Oracle SQL) -->
-                    <th><a href="@sortLink("schet")">schet</a></th>
-                    <th><a href="@sortLink("data")">data</a></th>
-                    <th><a href="@sortLink("kolich")">kolich</a></th>
-                </tr>
-            </thead>
-
-            <tbody>
-                @foreach (DataRow row in Model.Rows)
-                {
-                    <tr>
-                        <td>@row["schet"]</td>
-                        <td>@row["data"]</td>
-                        <td>@row["kolich"]</td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </div>
-
-</div>
