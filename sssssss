@@ -1,3 +1,431 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "DB Viewer";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="~/css/site.css" rel="stylesheet" />
+</head>
+<body>
+
+    <div class="layout">
+        <aside class="sidebar">
+            <h3>Таблицы</h3>
+
+            <div class="dropdown" id="tableDropdown">
+                <button class="dropdown-toggle" id="tablePickerToggle">Выбрать таблицы ▾</button>
+                <div class="dropdown-menu" id="tablePickerMenu">
+                    <div class="dropdown-header">
+                        <input id="tableSearch" class="dropdown-search" type="text" placeholder="Поиск по таблицам" />
+                    </div>
+
+                    <div class="dropdown-groups" id="tableGroups"></div>
+
+                    <div class="dropdown-actions">
+                        <button id="selectAllBtn">Выбрать все</button>
+                        <button id="clearAllBtn">Сбросить все</button>
+                        <button id="applySelectionBtn" class="btn">Применить</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="selected-wrap">
+                <div class="selected-title">Выбранные таблицы</div>
+                <div class="selected-list" id="selectedTables">
+                    <div class="hint-p">Пока ничего не выбрано</div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="content">
+            <h3>Фильтр по дате</h3>
+
+            <div class="hint" id="filterInfo">
+                Сначала выберите таблицу слева. После выбора таблицы станет доступен фильтр по датам.
+            </div>
+
+            <div class="toolbar">
+                <div style="display:flex; gap:8px; width: 100%; max-width: 540px;">
+                    <div style="flex:1;">
+                        <label for="startDate">Дата от</label>
+                        <input id="startDate" type="date" disabled />
+                    </div>
+                    <div style="flex:1;">
+                        <label for="endDate">Дата до</label>
+                        <input id="endDate" type="date" disabled />
+                    </div>
+                </div>
+
+                <button id="applyFilterBtn" class="btn" disabled>Применить фильтр</button>
+                <button id="resetFilterBtn" class="btn-secondary" disabled>Очистить фильтр</button>
+            </div>
+
+            <h3>Данные</h3>
+            <div id="content">
+                <div class="hint">Выберите таблицу слева, затем задайте даты и нажмите «Применить фильтр».</div>
+            </div>
+        </main>
+    </div>
+
+
+
+    <script>
+        const dataBaseUrl   = '@Url.Page("./Index", "Data")';
+        const exportBaseUrl = '@Url.Page("./Index", "Export")';
+
+        const tables = [
+          "ANGA_OTK","AUO_OPXR","BMC_1_2","DATACENTR","DATACENTR_OLD",
+          "EXCEL3","GEST","JA_1","JA_2","JASH_1","JASH_1_DUBL","JASH_2","JASH_2_DUBL",
+          "LAB_LNPP","LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE","LPC3_MM","MEX_CGCA","MEX_CGCA_LOG",
+          "MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG","MEX_LPC2","MEX_LPC2_LOG","MEX_LPC3",
+          "MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG","MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG","MICRO_CGCA",
+          "MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3","NDC_DUBLE_LNPP","NDC_LNPP","OTGR_CGCA",
+          "OTGR_CGCA_NEW","OTGR_CGCA_OLD","OTK","PROD_LNPP","PROD_LNPP_OLD","PROIZ_LPC3","PROIZV_ANGA",
+          "PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA","PROIZV_LKPP_OLD","PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV",
+          "PROIZV_LNPP","PROIZV_LNPP_OLD","PROIZV_LNPP_PROD_NEW","PROIZV_LNPP_PRODUCTIV","PROKAT_SMAZ",
+          "PRPROKAT_CEXA","RASTVOR_LNPP","RASTVOR_OPXR2","TEMP_NDC_020147","TEMP_NDC_NNN","VOZV_OTGR",
+          "XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2","XIMMUL_LPC2","XIMNTA_LPC2",
+          "XIMVXKONTR_LPC3","XIMXROM_LPC3"
+        ];
+
+
+
+
+        const groups = {
+          "ANGA": ["ANGA_OTK"],
+          "AUO": ["AUO_OPXR"],
+          "BMC": ["BMC_1_2"],
+          "DATACENTR": ["DATACENTR","DATACENTR_OLD"],
+          "EXCEL": ["EXCEL3"],
+          "JA": ["JA_1","JA_2"],
+          "JASH": ["JASH_1","JASH_1_DUBL","JASH_2","JASH_2_DUBL"],
+          "LAB_LNPP": ["LAB_LNPP"],
+          "LNGC": ["LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE"],
+          "LPC3_MM": ["LPC3_MM"],
+          "MEX": ["MEX_CGCA","MEX_CGCA_LOG","MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG",
+                  "MEX_LPC2","MEX_LPC2_LOG","MEX_LPC3","MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG",
+                  "MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG"],
+          "MICRO": ["MICRO_CGCA","MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3"],
+          "NDC": ["NDC_DUBLE_LNPP","NDC_LNPP"],
+          "OTGR": ["OTGR_CGCA","OTGR_CGCA_NEW","OTGR_CGCA_OLD","VOZV_OTGR"],
+          "OTK": ["OTK"],
+          "PROD": ["PROD_LNPP","PROD_LNPP_OLD"],
+          "PROIZ": ["PROIZ_LPC3","PROIZV_ANGA","PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA","PROIZV_LKPP_OLD",
+                    "PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV","PROIZV_LNPP","PROIZV_LNPP_OLD",
+                    "PROIZV_LNPP_PROD_NEW","PROIZV_LNPP_PRODUCTIV"],
+          "PROKAT": ["PROKAT_SMAZ","PRPROKAT_CEXA"],
+          "RASTVOR": ["RASTVOR_LNPP","RASTVOR_OPXR2"],
+          "TEMP": ["TEMP_NDC_020147","TEMP_NDC_NNN"],
+          "VOZV": ["VOZV_OTGR"],
+          "XIM": ["XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2",
+                  "XIMMUL_LPC2","XIMNTA_LPC2","XIMVXKONTR_LPC3","XIMXROM_LPC3"]
+        };
+
+
+
+        let currentTable = null;
+        let lastLoadedWithFilter = false;
+
+        const $id = (id) => document.getElementById(id);
+        const escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                           .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+                                           .replace(/'/g,'&#39;');
+        const escapeAttr = (s) => String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+        const formatValue = (v) => v == null ? '' : String(v);
+
+        function parseFilenameFromCD(cd){
+          if (!cd) return null;
+          const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+          if (!m) return null;
+          const raw = m[1] || m[2];
+          try { return decodeURIComponent(raw); } catch { return raw; }
+        }
+        function formatNowForFile(){
+          const d = new Date();
+          return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}`;
+        }
+
+        function groupTablesByLetter(arr){
+          const map = new Map();
+          for (const t of arr){
+            const first = t[0]?.toUpperCase() ?? '#';
+            const key = /[A-ZА-ЯЁ]/.test(first) ? first : '#';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(t);
+          }
+          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0],'ru'));
+        }
+
+
+        function renderGroups() {
+          const groupsEl = $id('tableGroups');
+          groupsEl.innerHTML = Object.entries(groups).map(([groupName, items]) => `
+            <section class="group" data-name="${groupName}">
+              <div class="group-header">
+                <div class="group-title">${groupName}</div>
+                <div class="group-actions">
+                  <button type="button" class="group-select" data-name="${groupName}">Все</button>
+                  <button type="button" class="group-clear" data-name="${groupName}">Сброс</button>
+                </div>
+              </div>
+              <div class="group-items">
+                ${items.map(name => `
+                  <label class="group-item">
+                    <input type="checkbox" data-table="${name}"/>
+                    <span>${name}</span>
+                  </label>
+                `).join('')}
+              </div>
+            </section>
+          `).join('');
+        }
+
+        function enableFilters(enabled){
+          $id('startDate').disabled = !enabled;
+          $id('endDate').disabled = !enabled;
+          $id('applyFilterBtn').disabled = !enabled;
+          $id('resetFilterBtn').disabled = !enabled;
+          $id('filterInfo').textContent = enabled
+            ? `Выбрана таблица: ${currentTable}.`
+            : 'Сначала выберите таблицу слева.';
+        }
+
+        function collectFilterParams(){
+          const sd = ($id('startDate')?.value || '').trim();
+          const ed = ($id('endDate')?.value || '').trim();
+          const params = new URLSearchParams();
+          if (sd) params.set('startDate', sd);
+          if (ed) params.set('endDate', ed);
+          return params;
+        }
+
+        function renderSelectedButtons(names){
+          const box = $id('selectedTables');
+          if(!names || names.length===0){
+            box.innerHTML = '<div class="hint-p">Пока ничего не выбрано</div>';
+            currentTable = null;
+            enableFilters(false);
+            $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+            return;
+          }
+          names.sort((a,b)=>a.localeCompare(b,'ru'));
+          box.innerHTML = names.map(name=>`
+            <button class="selected-btn" data-table="${name}">
+              ${name}
+              <span class="selected-remove" data-remove="${name}">✕</span>
+            </button>
+          `).join('');
+
+          box.querySelectorAll('.selected-btn').forEach(btn=>{
+            btn.addEventListener('click', e=>{
+              const rm = e.target.closest('[data-remove]');
+              if(rm){
+                const removed = rm.dataset.remove;
+                const rest = names.filter(n => n !== removed);
+                renderSelectedButtons(rest);
+                const checkbox = document.querySelector(`input[data-table="${removed}"]`);
+                if (checkbox) checkbox.checked = false;
+                if (currentTable === removed) {
+                  currentTable = null;
+                  enableFilters(false);
+                  $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+                }
+                return;
+              }
+              currentTable = btn.dataset.table;
+              lastLoadedWithFilter = false;
+              enableFilters(true);
+              loadTable(currentTable, true);
+            });
+          });
+        }
+
+        function installHandlers(){
+          const toggle = $id('tablePickerToggle');
+          const menu = $id('tablePickerMenu');
+          const search = $id('tableSearch');
+          const groupsEl = $id('tableGroups');
+
+          toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
+          document.addEventListener('click', e=>{
+            if(!menu.contains(e.target) && !toggle.contains(e.target)) menu.classList.remove('open');
+          });
+
+          search.addEventListener('input', ()=>{
+            const q = search.value.toLowerCase();
+            for(const item of groupsEl.querySelectorAll('.group-item')){
+              item.style.display = item.textContent.toLowerCase().includes(q)?'':'none';
+            }
+          });
+
+          groupsEl.addEventListener('click', e=>{
+            const btn = e.target.closest('button.group-select,button.group-clear');
+            if(!btn) return;
+            const letter = btn.dataset.letter;
+            const section = groupsEl.querySelector(`.group[data-letter="${letter}"]`);
+            const check = btn.classList.contains('group-select');
+            for(const cb of section.querySelectorAll('input[type="checkbox"]')) cb.checked = check;
+          });
+
+          $id('selectAllBtn').addEventListener('click',()=>{
+            for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = true;
+          });
+          $id('clearAllBtn').addEventListener('click',()=>{
+            for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = false;
+          });
+          $id('applySelectionBtn').addEventListener('click',()=>{
+            const selected = Array.from(groupsEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.table);
+            renderSelectedButtons(selected);
+            menu.classList.remove('open');
+          });
+
+          $id('applyFilterBtn').addEventListener('click', ()=>{
+            if(!currentTable){ alert('Сначала выберите таблицу.'); return; }
+            lastLoadedWithFilter = true;
+            loadTable(currentTable, false);
+          });
+
+          $id('resetFilterBtn').addEventListener('click', ()=>{
+            $id('startDate').value = '';
+            $id('endDate').value = '';
+            enableFilters(!!currentTable);
+          });
+        }
+
+        function setExportEnabled(enabled){
+          const btn = document.getElementById('exportBtn');
+          if (!btn) return;
+          btn.disabled = !enabled;
+        }
+
+        async function loadTable(table, initial){
+          const content = $id('content');
+          content.innerHTML = `<div class="spinner">Загрузка данных из ${escapeHtml(table)}…</div>`;
+          setExportEnabled(false);
+
+          try{
+            const base = `${dataBaseUrl}&table=${encodeURIComponent(table)}`;
+            const url = initial ? base : `${base}&${collectFilterParams().toString()}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            const sd = ($id('startDate')?.value || '').trim().replace(/-/g, '.');
+            const ed = ($id('endDate')?.value || '').trim().replace(/-/g, '.');
+            const filterBadge = (!initial && (sd || ed))
+              ? `<span class="hint">Фильтр: ${sd || '...'} - ${ed || '...'}</span>`
+              : `<span class="hint">Без фильтра</span>`;
+
+            if (!Array.isArray(data) || data.length===0){
+              content.innerHTML = `
+                <h3>${escapeHtml(table)} ${filterBadge}</h3>
+                <div class="toolbar">
+                  <button id="exportBtn" class="btn" disabled onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+                </div>
+                <p class="hint">Нет данных.</p>`;
+              return;
+            }
+
+            const columns = Object.keys(data[0]);
+            const thead = `<thead><tr>${columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+            const tbody = `<tbody>${data.map(row=>`<tr>${columns.map(c=>`<td>${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+
+            content.innerHTML = `
+              <h3>${escapeHtml(table)} ${filterBadge}</h3>
+              <div class="toolbar">
+                <button id="exportBtn" class="btn" onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+              </div>
+              <div class="table-wrap"><table>${thead}${tbody}</table></div>`;
+            setExportEnabled(true);
+          }
+          catch(err){
+            content.innerHTML = `<div class="error">Ошибка: ${escapeHtml(err.message)}</div>`;
+            setExportEnabled(false);
+          }
+        }
+
+
+        const exportModal = document.createElement("div");
+        exportModal.className = "export-modal";
+        exportModal.innerHTML = `
+            <div class="export-modal-box">
+                <div class="export-text">Пожалуйста, подождите…</div>
+            </div>
+        `;
+        document.body.appendChild(exportModal);
+
+        // === Функции управления модалкой ===
+        function showExportModal(){
+            exportModal.classList.add("open");
+        }
+
+        function hideExportModal(){
+            exportModal.classList.remove("open");
+        }
+
+        window.exportExcel = async function(table){
+            const btn = document.getElementById('exportBtn');
+            if (btn && btn.disabled) return;
+
+            showExportModal();
+
+            const base = `${exportBaseUrl}&table=${encodeURIComponent(table)}`;
+            const url  = lastLoadedWithFilter
+                ? `${base}&${collectFilterParams().toString()}`
+                : base;
+
+            try {
+                const resp = await fetch(url);
+
+                const cd = resp.headers.get('Content-Disposition') || '';
+                const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+                const raw = m ? (m[1] || m[2]) : null;
+                const name = raw ? decodeURIComponent(raw) : `${table}_${formatNowForFile()}.xlsx`;
+
+                const blob = await resp.blob();
+                const blobUrl = URL.createObjectURL(blob);
+
+                const a = document.createElement('a');
+                a.href = blobUrl;
+                a.download = name;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+
+                URL.revokeObjectURL(blobUrl);
+            }
+            catch (err){
+                alert("Ошибка: " + err.message);
+            }
+            finally{
+                hideExportModal();
+            }
+        };
+
+        // Форматирование даты для имени файла
+        function formatNowForFile(){
+            const d = new Date();
+            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+
+        // запуск
+        renderGroups();
+        installHandlers();
+        enableFilters(false);
+        renderSelectedButtons([]);
+        window.exportExcel = exportExcel;
+    </script>
+</body>
+</html>
+_____________
+
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -6,6 +434,11 @@ using Oracle.ManagedDataAccess.Client;
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.Common;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 
 public class IndexModel : PageModel
 {
@@ -16,207 +449,368 @@ public class IndexModel : PageModel
         _config = config;
     }
 
-    public class ColumnInfo
+    // Разрешённые таблицы
+    public static readonly HashSet<string> AllowedTables = new(StringComparer.OrdinalIgnoreCase)
     {
-        public string Name { get; set; }
-        public string Type { get; set; }
-    }
+        "ANGA_OTK","AUO_OPXR","BMC_1_2","DATACENTR","DATACENTR_OLD","EXCEL3","GEST","JA_1","JA_2","JASH_1",
+    "JASH_1_DUBL","JASH_2","JASH_2_DUBL","LAB_LNPP","LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE","LPC3_MM",
+    "MEX_CGCA","MEX_CGCA_LOG","MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG","MEX_LPC2","MEX_LPC2_LOG",
+    "MEX_LPC3","MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG","MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG","MICRO_CGCA",
+    "MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3","NDC_DUBLE_LNPP","NDC_LNPP","OTGR_CGCA","OTGR_CGCA_NEW",
+    "OTGR_CGCA_OLD","OTK","PROD_LNPP","PROD_LNPP_OLD","PROIZ_LPC3","PROIZV_ANGA","PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA",
+    "PROIZV_LKPP_OLD","PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV","PROIZV_LNPP","PROIZV_LNPP_OLD","PROIZV_LNPP_PROD_NEW",
+    "PROIZV_LNPP_PRODUCTIV","PROKAT_SMAZ","PRPROKAT_CEXA","RASTVOR_LNPP","RASTVOR_OPXR2","TEMP_NDC_020147","TEMP_NDC_NNN",
+    "VOZV_OTGR","XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2","XIMMUL_LPC2","XIMNTA_LPC2","XIMVXKONTR_LPC3",
+    "XIMXROM_LPC3"
+    };
 
-    public List<ColumnInfo> Columns { get; set; } = new();
-    public DataTable TableData { get; set; } = new();
+    private static readonly Dictionary<string, string> DefaultDateColumnByTable =
 
-    public void OnGet()
+new(StringComparer.OrdinalIgnoreCase)
+{
+    ["ANGA_OTK"] = "DATA",
+    ["AUO_OPXR"] = "DATA_ID",
+    ["BMC_1_2"] = "DATA_ID",
+    ["DATACENTR"] = "SAMPLE_DATETIME",
+    ["DATACENTR_OLD"] = "SAMPLE_DATETIME",
+    ["EXCEL3"] = "",
+    ["GEST"] = "DATA_ID",
+    ["JA_1"] = "SAMPLE_DATETIME",
+    ["JA_2"] = "SAMPLE_DATETIME",
+    ["JASH_1"] = "CREATE_DATA",
+    ["JASH_1_DUBL"] = "SAMPLE_DATETIME",
+    ["JASH_2"] = "CREATE_DATE",
+    ["JASH_2_DUBL"] = "SAMPLE_DATETIME",
+    ["LAB_LNPP"] = "DATA",
+    ["LNGC_DATACENTR"] = "SAMPLE_DATETIME",
+    ["LNGC_OTK"] = "DATA",
+    ["LNGC_OTK_DUBLE"] = "SAMPLE_DATETIME",
+    ["LPC3_MM"] = "DATA_PR",
+    ["MEX_CGCA"] = "DATA_ID",
+    ["MEX_CGCA_LOG"] = "DATA_ID",
+    ["MEX_LAB_OB"] = "DATA_ID_CG",
+    ["MEX_LPC1"] = "DATA_ID",
+    ["MEX_LPC1_DUBLE"] = "DATA_ID",
+    ["MEX_LPC1_LOG"] = "DATA_ID",
+    ["MEX_LPC2"] = "DATA_ID",
+    ["MEX_LPC2_LOG"] = "DATA_ID",
+    ["MEX_LPC3"] = "DATA_ID",
+    ["MEX_LPC3_LOG"] = "DATA_ID",
+    ["MEX_LPC3_UCH"] = "DATA_ID",
+    ["MEX_LPC3_UCH_LOG"] = "DATA_ID",
+    ["MEX_SPC"] = "DATA_ID",
+    ["MEX_TRUBN"] = "DATA_ID",
+    ["MEX_TRUBN_LOG"] = "DATA_ID",
+    ["MICRO_CGCA"] = "CREATED_ID",
+    ["MICRO_LPC1"] = "CREATED_ID",
+    ["MICRO_LPC1_NEW"] = "DATE_MICRO",
+    ["MICRO_LPC2"] = "CREATED_DATE",
+    ["MICRO_LPC3"] = "CREATED_DATE",
+    ["NDC_DUBLE_LNPP"] = "DATE_CREATE",
+    ["NDC_LNPP"] = "DATE_CRATE",
+    ["OTGR_CGCA"] = "DATA_CEHA",
+    ["OTGR_CGCA_NEW"] = "DATA_CEHA",
+    ["OTGR_CGCA_OLD"] = "DATA_CEHA",
+    ["OTK"] = "DATA",
+    ["PROD_LNPP"] = "DATE_NACH",
+    ["PROD_LNPP_OLD"] = "DATA",
+    ["PROIZ_LPC3"] = "DATA",
+    ["PROIZV_ANGA"] = "DATA",
+    ["PROIZV_ANGA_PRODUCTIV"] = "DATA",
+    ["PROIZV_CGCA"] = "DATA",
+    ["PROIZV_LKPP_OLD"] = "DATA",
+    ["PROIZV_LNGC"] = "DATA",
+    ["PROIZV_LNGC_PRODUCTIV"] = "DATA",
+    ["PROIZV_LNPP"] = "DATA",
+    ["PROIZV_LNPP_OLD"] = "DATA",
+    ["PROIZV_LNPP_PROD_NEW"] = "DATA",
+    ["PROIZV_LNPP_PRODUCTIV"] = "DATA",
+    ["PROKAT_SMAZ"] = "DATA_ID",
+    ["PRPROKAT_CEXA"] = "DATA_ID",
+    ["RASTVOR_LNPP"] = "DATA",
+    ["RASTVOR_OPXR2"] = "DATA_ID",
+    ["TEMP_NDC_020147"] = "DATE_CREATE",
+    ["TEMP_NDC_NNN"] = "DATE_CREATE",
+    ["VOZV_OTGR"] = "DATE_CREATE",
+    ["XIM_VODA"] = "DATE_CREATE",
+    ["XIMBXU_LPC2"] = "DATA_ID",
+    ["XIMKISLOTA_LPC2"] = "DATA_ID",
+    ["XIMMASLO_LPC2"] = "DATA_ID",
+    ["XIMMUL_LPC2"] = "DATA_ID",
+    ["XIMNTA_LPC2"] = "DATA_ID",
+    ["XIMVXKONTR_LPC3"] = "DATA_ID",
+    ["XIMXROM_LPC3"] = "DATA_ID"
+};
+
+
+    // Дефолтные исключаемые столбцы (если нужно скрыть служебные)
+    private static readonly HashSet<string> DefaultExcludeColumns =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "ORA_ROWSCN","SYS_CREATION_DATE","SYS_UPDATE_DATE"
+        };
+
+    private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    /// <summary> JSON: фильтр только по датам (от/до), колонка даты берется из дефолтов. </summary>
+    public IActionResult OnGetData(string table, string? startDate, string? endDate)
     {
-        LoadColumns();
-        LoadData(null);
-    }
+        if (string.IsNullOrWhiteSpace(table))
+            return new JsonResult(new { error = "Table is required." }) { StatusCode = 400 };
 
-    public IActionResult OnPostFilter(string column, string columnType, string numberValue,
-                                      string textValue, string dateFrom, string dateTo)
-    {
-        LoadColumns();
+        var tableUpper = table.Trim().ToUpperInvariant();
+        if (!AllowedTables.Contains(tableUpper))
+            return new JsonResult(new { error = "Table is not allowed." }) { StatusCode = 400 };
 
-        string where = BuildWhere(column, columnType, numberValue, textValue, dateFrom, dateTo);
+        var dateColumn = ResolveDateColumn(tableUpper);
+        var start = ParseDate(startDate);
+        var end = ParseDate(endDate);
 
-        LoadData(where);
-
-        return Page();
-    }
-
-    private void LoadColumns()
-    {
-        Columns.Clear();
-
-        using var conn = new OracleConnection(_config.GetConnectionString("DefaultConnection"));
+        var connString = _config.GetConnectionString("OracleConnection");
+        using var conn = new OracleConnection(connString);
         conn.Open();
 
-        using var cmd = new OracleCommand(@"
-            SELECT COLUMN_NAME, DATA_TYPE 
-            FROM ALL_TAB_COLUMNS 
-            WHERE TABLE_NAME = 'MY_TABLE'
-            ORDER BY COLUMN_ID
-        ", conn);
-
-        using var rd = cmd.ExecuteReader();
-        while (rd.Read())
+        try
         {
-            Columns.Add(new ColumnInfo
+            var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
+            if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
+                return new JsonResult(new { error = $"Колонка даты '{dateColumn}' отсутствует в {tableUpper}." }) { StatusCode = 500 };
+
+            var sql = BuildSql(tableUpper, columns, dateColumn, start, end);
+            using var cmd = new OracleCommand(sql, conn);
+            BindDateParams(cmd, start, end);
+
+            using var reader = cmd.ExecuteReader();
+
+            var rows = new List<Dictionary<string, object?>>();
+            var schema = reader.GetColumnSchema();
+
+            while (reader.Read())
             {
-                Name = rd.GetString(0),
-                Type = rd.GetString(1)
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var col in schema)
+                {
+                    var raw = reader[col.ColumnName];
+                    if (raw == DBNull.Value)
+                        row[col.ColumnName] = null;
+                    else if (raw is DateTime dt)
+                        row[col.ColumnName] = dt.ToString("dd.MM.yy");
+                    else
+                        row[col.ColumnName] = raw;
+                }
+                rows.Add(row);
+            }
+
+            return new JsonResult(rows, new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = null,
+                WriteIndented = false
+            });
+        }
+        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        {
+            return new JsonResult(Array.Empty<object>(), new JsonSerializerOptions
+            {
+                PropertyNamingPolicy = null,
+                WriteIndented = false
             });
         }
     }
 
-    private void LoadData(string where)
+    /// <summary> Экспорт: фильтр только по датам (от/до), колонка даты из дефолтов. </summary>
+    public IActionResult OnGetExport(string table, string? startDate, string? endDate)
     {
-        using var conn = new OracleConnection(_config.GetConnectionString("DefaultConnection"));
-        conn.Open();
+        try
+        {
+            if (string.IsNullOrWhiteSpace(table))
+                return BadRequest("Table is required.");
 
-        string sql = "SELECT * FROM MY_TABLE";
+            var tableUpper = table.Trim().ToUpperInvariant();
+            if (!AllowedTables.Contains(tableUpper))
+                return BadRequest("Table is not allowed.");
 
-        if (!string.IsNullOrEmpty(where))
-            sql += " WHERE " + where;
+            var dateColumn = ResolveDateColumn(tableUpper);
+            var start = ParseDate(startDate);
+            var end = ParseDate(endDate);
 
-        using var da = new OracleDataAdapter(sql, conn);
-        TableData.Clear();
-        da.Fill(TableData);
+            var connString = _config.GetConnectionString("OracleConnection");
+            using var conn = new OracleConnection(connString);
+            conn.Open();
+
+            var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
+            if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
+                return BadRequest($"Колонка даты '{dateColumn}' отсутствует в {tableUpper}.");
+
+            var sql = BuildSql(tableUpper, columns, dateColumn, start, end);
+            using var cmd = new OracleCommand(sql, conn);
+            BindDateParams(cmd, start, end);
+            using var reader = cmd.ExecuteReader();
+
+            var dt = ToDataTable(reader);
+
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add(dt, tableUpper);
+
+            var tbl = ws.Tables.FirstOrDefault();
+            if (tbl != null) tbl.ShowAutoFilter = true;
+
+            ws.SheetView.FreezeRows(1);
+            ApplyDateColumnFormats(ws, dt);
+            ws.Columns().AdjustToContents();
+
+            byte[] bytes;
+            using (var ms = new MemoryStream())
+            {
+                wb.SaveAs(ms);
+                bytes = ms.ToArray();
+            }
+
+            var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
+            return File(bytes, ContentTypeXlsx, fileName);
+        }
+        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        {
+            using var wbEmpty = new XLWorkbook();
+            var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
+            wsEmpty.Cell(1, 1).Value = "Нет данных";
+            wsEmpty.Columns().AdjustToContents();
+
+            byte[] emptyBytes;
+            using (var msEmpty = new MemoryStream())
+            {
+                wbEmpty.SaveAs(msEmpty);
+                emptyBytes = msEmpty.ToArray();
+            }
+
+            return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
-    private string BuildWhere(string column, string type, string numberValue,
-                              string textValue, string dateFrom, string dateTo)
+    // === Helpers ===
+
+    private static string ResolveDateColumn(string tableUpper)
+        => DefaultDateColumnByTable.TryGetValue(tableUpper, out var col) ? col : "DT"; // общий дефолт
+
+    private static string BuildSql(
+        string tableUpper,
+        IReadOnlyList<string> selectedColumns,
+        string dateColumn,
+        DateTime? startDate,
+        DateTime? endDate)
     {
-        if (type.Contains("NUMBER"))
-        {
-            return $"{column} = {numberValue}";
-        }
+        var selectList = string.Join(", ", selectedColumns.Select(c => $"\"{c}\""));
 
-        if (type.Contains("CHAR") || type.Contains("VARCHAR"))
-        {
-            return $"{column} LIKE '%{textValue}%'";
-        }
+        var where = "";
+        var parts = new List<string>();
+        if (startDate.HasValue) parts.Add($"\"{dateColumn}\" >= :pStart");
+        if (endDate.HasValue) parts.Add($"\"{dateColumn}\" <= :pEnd");
+        if (parts.Count > 0) where = $"WHERE {string.Join(" AND ", parts)}";
 
-        if (type.Contains("DATE"))
-        {
-            return $"{column} BETWEEN TO_DATE('{dateFrom}', 'YYYY-MM-DD') 
-                                 AND TO_DATE('{dateTo}', 'YYYY-MM-DD')";
-        }
+        var sql = $@"
+            SELECT {selectList}
+            FROM {tableUpper}
+            {where}
+            FETCH FIRST 1000 ROWS ONLY";
+        return sql;
+    }
 
+    private static void BindDateParams(OracleCommand cmd, DateTime? startDate, DateTime? endDate)
+    {
+        if (startDate.HasValue)
+            cmd.Parameters.Add(new OracleParameter("pStart", OracleDbType.Date) { Value = startDate.Value.Date });
+
+        if (endDate.HasValue)
+        {
+            var inclusiveEnd = endDate.Value.Date.AddDays(1).AddSeconds(-1);
+            cmd.Parameters.Add(new OracleParameter("pEnd", OracleDbType.Date) { Value = inclusiveEnd });
+        }
+    }
+
+    private static DateTime? ParseDate(string? s)
+    {
+        if (string.IsNullOrWhiteSpace(s)) return null;
+
+        var formats = new[] { "yyyy-MM-dd", "dd.MM.yyyy", "dd.MM.yy" };
+        if (DateTime.TryParseExact(s.Trim(), formats, CultureInfo.InvariantCulture,
+            DateTimeStyles.AssumeLocal, out var dt))
+            return dt.Date;
+
+        if (DateTime.TryParse(s, out dt)) return dt.Date;
         return null;
     }
-}
 
+    private static List<string> GetColumns(OracleConnection conn, string tableUpper, HashSet<string> exclude)
+    {
+        var sql = $"SELECT * FROM {tableUpper} FETCH FIRST 1 ROWS ONLY";
+        using var cmd = new OracleCommand(sql, conn);
+        using var reader = cmd.ExecuteReader(CommandBehavior.SchemaOnly);
 
+        var schemaTable = reader.GetSchemaTable();
+        var cols = new List<string>();
 
-@page
-@model IndexModel
-@{
-    Layout = null;
-}
-
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-    <title>Фильтрация таблицы</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" />
-</head>
-
-<body class="p-4">
-
-<h2>Фильтрация</h2>
-
-<form method="post" asp-page-handler="Filter" class="border p-3">
-    <div class="row mb-3">
-        <div class="col-4">
-            <label>Колонка</label>
-            <select name="column" id="columnSelect" class="form-select" required>
-                <option disabled selected>Выберите колонку</option>
-                @foreach (var col in Model.Columns)
-                {
-                    <option value="@col.Name" data-type="@col.Type">@col.Name</option>
-                }
-            </select>
-
-            <input type="hidden" id="columnType" name="columnType" />
-        </div>
-
-        <div class="col-8">
-
-            <!-- NUMBER -->
-            <div id="field-number" style="display:none">
-                <label>Введите число:</label>
-                <input class="form-control" type="number" name="numberValue" />
-            </div>
-
-            <!-- TEXT -->
-            <div id="field-text" style="display:none">
-                <label>Введите текст:</label>
-                <input class="form-control" type="text" name="textValue" />
-            </div>
-
-            <!-- DATE -->
-            <div id="field-date" style="display:none">
-                <label>Дата от:</label>
-                <input class="form-control" type="date" name="dateFrom" />
-                <label class="mt-2">Дата до:</label>
-                <input class="form-control" type="date" name="dateTo" />
-            </div>
-
-        </div>
-    </div>
-
-    <button class="btn btn-primary">Фильтровать</button>
-</form>
-
-<hr />
-
-<h2>Результаты</h2>
-
-<table class="table table-bordered table-striped">
-    <thead>
-        <tr>
-            @foreach (DataColumn col in Model.TableData.Columns)
-            {
-                <th>@col.ColumnName</th>
-            }
-        </tr>
-    </thead>
-
-    <tbody>
-        @foreach (DataRow row in Model.TableData.Rows)
+        if (schemaTable != null)
         {
-            <tr>
-                @foreach (var cell in row.ItemArray)
-                {
-                    <td>@cell</td>
-                }
-            </tr>
+            foreach (DataRow row in schemaTable.Rows)
+            {
+                var name = row["ColumnName"]?.ToString();
+                if (!string.IsNullOrWhiteSpace(name) && !exclude.Contains(name))
+                    cols.Add(name);
+            }
         }
-    </tbody>
-</table>
 
-<script>
-document.getElementById("columnSelect").addEventListener("change", function () {
-    const type = this.options[this.selectedIndex].dataset.type.toUpperCase();
+        if (cols.Count == 0)
+            throw new InvalidOperationException($"Не удалось получить колонки таблицы {tableUpper}.");
 
-    document.getElementById("columnType").value = type;
-
-    document.getElementById("field-number").style.display = "none";
-    document.getElementById("field-text").style.display = "none";
-    document.getElementById("field-date").style.display = "none";
-
-    if (type.includes("NUMBER")) {
-        document.getElementById("field-number").style.display = "block";
-    } 
-    else if (type.includes("CHAR") || type.includes("VARCHAR")) {
-        document.getElementById("field-text").style.display = "block";
-    } 
-    else if (type.includes("DATE")) {
-        document.getElementById("field-date").style.display = "block";
+        return cols;
     }
-});
-</script>
 
-</body>
-</html>
+    private static DataTable ToDataTable(OracleDataReader reader)
+    {
+        var dt = new DataTable();
+        var schema = reader.GetColumnSchema();
+
+        foreach (var col in schema)
+        {
+            var type = col.DataType ?? typeof(string);
+            if (type == typeof(object) && !string.IsNullOrEmpty(col.DataTypeName))
+            {
+                var name = col.DataTypeName.ToUpperInvariant();
+                if (name.Contains("DATE") || name.Contains("TIMESTAMP"))
+                    type = typeof(DateTime);
+                else if (name.Contains("NUMBER"))
+                    type = typeof(decimal);
+                else if (name.Contains("FLOAT") || name.Contains("BINARY_FLOAT") || name.Contains("BINARY_DOUBLE"))
+                    type = typeof(double);
+            }
+
+            dt.Columns.Add(col.ColumnName, type);
+        }
+
+        while (reader.Read())
+        {
+            var row = dt.NewRow();
+            for (int i = 0; i < dt.Columns.Count; i++)
+                row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
+
+            dt.Rows.Add(row);
+        }
+
+        return dt;
+    }
+
+
+    private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt)
+    {
+        for (int i = 0; i < dt.Columns.Count; i++)
+        {
+            var col = dt.Columns[i];
+            if (col.DataType == typeof(DateTime))
+                ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yy";
+        }
+    }
+
+}
