@@ -1,67 +1,43 @@
-// === Создаём модальное окно через JS ===
-const exportModal = document.createElement("div");
-exportModal.className = "export-modal";
-exportModal.innerHTML = `
-    <div class="export-modal-box">
-        <div class="export-spinner"></div>
-        <div class="export-text">Пожалуйста, подождите…</div>
-    </div>
-`;
-document.body.appendChild(exportModal);
-
-// === Функции управления модалкой ===
-function showExportModal(){
-    exportModal.classList.add("open");
+.export-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(2px);
+    z-index: 99999;
+    justify-content: center;
+    align-items: center;
 }
 
-function hideExportModal(){
-    exportModal.classList.remove("open");
+.export-modal.open {
+    display: flex;
 }
 
-// === Функция экспорта Excel ===
-// Вставь свою exportBaseUrl, lastLoadedWithFilter и collectFilterParams()
-// если они у тебя в другом месте
-window.exportExcel = async function(table){
-    const btn = document.getElementById('exportBtn');
-    if (btn && btn.disabled) return;
+.export-modal-box {
+    background: #fff;
+    padding: 25px 35px;
+    border-radius: 10px;
+    text-align: center;
+    font-size: 18px;
+    color: #333;
+    min-width: 260px;
+    box-shadow: 0 0 20px rgba(0,0,0,0.25);
+}
 
-    showExportModal();
+.export-spinner {
+    width: 42px;
+    height: 42px;
+    border: 5px solid #ccc;
+    border-top-color: #3498db;
+    border-radius: 50%;
+    animation: exportSpin 0.7s linear infinite;
+    margin: 0 auto 15px;
+}
 
-    const base = `${exportBaseUrl}&table=${encodeURIComponent(table)}`;
-    const url  = lastLoadedWithFilter
-        ? `${base}&${collectFilterParams().toString()}`
-        : base;
+.export-text {
+    margin-top: 5px;
+}
 
-    try {
-        const resp = await fetch(url);
-
-        const cd = resp.headers.get('Content-Disposition') || '';
-        const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-        const raw = m ? (m[1] || m[2]) : null;
-        const name = raw ? decodeURIComponent(raw) : `${table}_${formatNowForFile()}.xlsx`;
-
-        const blob = await resp.blob();
-        const blobUrl = URL.createObjectURL(blob);
-
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = name;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-
-        URL.revokeObjectURL(blobUrl);
-    }
-    catch (err){
-        alert("Ошибка: " + err.message);
-    }
-    finally{
-        hideExportModal();
-    }
-};
-
-// Форматирование даты для имени файла
-function formatNowForFile(){
-    const d = new Date();
-    return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
+@keyframes exportSpin {
+    to { transform: rotate(360deg); }
 }
