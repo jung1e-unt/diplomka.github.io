@@ -1,267 +1,353 @@
-    <script>
-        const dataBaseUrl   = '@Url.Page("./Index", "Data")';
-        const exportBaseUrl = '@Url.Page("./Index", "Export")';
+<script>
+const dataBaseUrl   = '@Url.Page("./Index", "Data")';
+const exportBaseUrl = '@Url.Page("./Index", "Export")';
 
-        const tables = [
-          "ANGA_OTK","AUO_OPXR","BMC_1_2","DATACENTR","DATACENTR_OLD",
-          "EXCEL3","GEST","JA_1","JA_2","JASH_1","JASH_1_DUBL","JASH_2","JASH_2_DUBL",
-          "LAB_LNPP","LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE","LPC3_MM","MEX_CGCA","MEX_CGCA_LOG",
-          "MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG","MEX_LPC2","MEX_LPC2_LOG","MEX_LPC3",
-          "MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG","MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG","MICRO_CGCA",
-          "MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3","NDC_DUBLE_LNPP","NDC_LNPP","OTGR_CGCA",
-          "OTGR_CGCA_NEW","OTGR_CGCA_OLD","OTK","PROD_LNPP","PROD_LNPP_OLD","PROIZ_LPC3","PROIZV_ANGA",
-          "PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA","PROIZV_LKPP_OLD","PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV",
-          "PROIZV_LNPP","PROIZV_LNPP_OLD","PROIZV_LNPP_PROD_NEW","PROIZV_LNPP_PRODUCTIV","PROKAT_SMAZ",
-          "PRPROKAT_CEXA","RASTVOR_LNPP","RASTVOR_OPXR2","TEMP_NDC_020147","TEMP_NDC_NNN","VOZV_OTGR",
-          "XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2","XIMMUL_LPC2","XIMNTA_LPC2",
-          "XIMVXKONTR_LPC3","XIMXROM_LPC3"
-        ];
+const tables = [
+  "ANGA_OTK","AUO_OPXR","BMC_1_2","DATACENTR","DATACENTR_OLD",
+  "EXCEL3","GEST","JA_1","JA_2","JASH_1","JASH_1_DUBL","JASH_2","JASH_2_DUBL",
+  "LAB_LNPP","LNGC_DATACENTR","LNGC_OTK","LNGC_OTK_DUBLE","LPC3_MM","MEX_CGCA","MEX_CGCA_LOG",
+  "MEX_LAB_OB","MEX_LPC1","MEX_LPC1_DUBLE","MEX_LPC1_LOG","MEX_LPC2","MEX_LPC2_LOG","MEX_LPC3",
+  "MEX_LPC3_LOG","MEX_LPC3_UCH","MEX_LPC3_UCH_LOG","MEX_SPC","MEX_TRUBN","MEX_TRUBN_LOG","MICRO_CGCA",
+  "MICRO_LPC1","MICRO_LPC1_NEW","MICRO_LPC2","MICRO_LPC3","NDC_DUBLE_LNPP","NDC_LNPP","OTGR_CGCA",
+  "OTGR_CGCA_NEW","OTGR_CGCA_OLD","OTK","PROD_LNPP","PROD_LNPP_OLD","PROIZ_LPC3","PROIZV_ANGA",
+  "PROIZV_ANGA_PRODUCTIV","PROIZV_CGCA","PROIZV_LKPP_OLD","PROIZV_LNGC","PROIZV_LNGC_PRODUCTIV",
+  "PROIZV_LNPP","PROIZV_LNPP_OLD","PROIZV_LNPP_PROD_NEW","PROIZV_LNPP_PRODUCTIV","PROKAT_SMAZ",
+  "PRPROKAT_CEXA","RASTVOR_LNPP","RASTVOR_OPXR2","TEMP_NDC_020147","TEMP_NDC_NNN","VOZV_OTGR",
+  "XIM_VODA","XIMBXU_LPC2","XIMKISLOTA_LPC2","XIMMASLO_LPC2","XIMMUL_LPC2","XIMNTA_LPC2",
+  "XIMVXKONTR_LPC3","XIMXROM_LPC3"
+];
 
-        let currentTable = null;
-        let lastLoadedWithFilter = false;
+let currentTable = null;
+let lastLoadedWithFilter = false;
 
-        const $id = (id) => document.getElementById(id);
-        const escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        const escapeAttr = (s) => String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-        const formatValue = (v) => v==null ? '' : String(v);
+const $id = (id) => document.getElementById(id);
+const escapeHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+                                   .replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+                                   .replace(/'/g,'&#39;');
+const escapeAttr = (s) => String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const formatValue = (v) => v == null ? '' : String(v);
 
-        function parseFilenameFromCD(cd){
-          if (!cd) return null;
-          const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-          if (!m) return null;
-          const raw = m[1] || m[2];
-          try { return decodeURIComponent(raw); } catch { return raw; }
+function parseFilenameFromCD(cd){
+  if (!cd) return null;
+  const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+  if (!m) return null;
+  const raw = m[1] || m[2];
+  try { return decodeURIComponent(raw); } catch { return raw; }
+}
+function formatNowForFile(){
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}`;
+}
+
+function groupTablesByLetter(arr){
+  const map = new Map();
+  for (const t of arr){
+    const first = t[0]?.toUpperCase() ?? '#';
+    const key = /[A-ZА-ЯЁ]/.test(first) ? first : '#';
+    if (!map.has(key)) map.set(key, []);
+    map.get(key).push(t);
+  }
+  return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0],'ru'));
+}
+
+function renderGroups(){
+  const groupsEl = $id('tableGroups');
+  const byLetter = groupTablesByLetter(tables);
+  groupsEl.innerHTML = byLetter.map(([letter, items]) => `
+    <section class="group" data-letter="${letter}">
+      <div class="group-header">
+        <div class="group-title">${letter}</div>
+        <div class="group-actions">
+          <button type="button" class="group-select" data-letter="${letter}">Все</button>
+          <button type="button" class="group-clear" data-letter="${letter}">Сброс</button>
+        </div>
+      </div>
+      <div class="group-items">
+        ${items.map(name => `
+          <label class="group-item">
+            <input type="checkbox" data-table="${name}"/>
+            <span>${name}</span>
+          </label>
+        `).join('')}
+      </div>
+    </section>
+  `).join('');
+}
+
+function enableFilters(enabled){
+  $id('startDate').disabled = !enabled;
+  $id('endDate').disabled = !enabled;
+  $id('applyFilterBtn').disabled = !enabled;
+  $id('resetFilterBtn').disabled = !enabled;
+  $id('filterInfo').textContent = enabled
+    ? `Выбрана таблица: ${currentTable}.`
+    : 'Сначала выберите таблицу слева.';
+}
+
+function collectFilterParams(){
+  const sd = ($id('startDate')?.value || '').trim();
+  const ed = ($id('endDate')?.value || '').trim();
+  const params = new URLSearchParams();
+  if (sd) params.set('startDate', sd);
+  if (ed) params.set('endDate', ed);
+  return params;
+}
+
+function renderSelectedButtons(names){
+  const box = $id('selectedTables');
+  if(!names || names.length===0){
+    box.innerHTML = '<div class="hint">Пока ничего не выбрано</div>';
+    currentTable = null;
+    enableFilters(false);
+    $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+    return;
+  }
+  names.sort((a,b)=>a.localeCompare(b,'ru'));
+  box.innerHTML = names.map(name=>`
+    <button class="selected-btn" data-table="${name}">
+      ${name}
+      <span class="selected-remove" data-remove="${name}">✕</span>
+    </button>
+  `).join('');
+
+  box.querySelectorAll('.selected-btn').forEach(btn=>{
+    btn.addEventListener('click', e=>{
+      const rm = e.target.closest('[data-remove]');
+      if(rm){
+        const removed = rm.dataset.remove;
+        const rest = names.filter(n => n !== removed);
+        renderSelectedButtons(rest);
+        const checkbox = document.querySelector(`input[data-table="${removed}"]`);
+        if (checkbox) checkbox.checked = false;
+        if (currentTable === removed) {
+          currentTable = null;
+          enableFilters(false);
+          $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
         }
-        function formatNowForFile(){
-          const d=new Date();
-          return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}`;
-        }
+        return;
+      }
+      currentTable = btn.dataset.table;
+      lastLoadedWithFilter = false;
+      enableFilters(true);
+      loadTable(currentTable, true);
+    });
+  });
+}
 
-        function groupTablesByLetter(arr){
-          const map = new Map();
-          for (const t of arr){
-            const first = t[0]?.toUpperCase() ?? '#';
-            const key = /[A-ZА-ЯЁ]/.test(first) ? first : '#';
-            if (!map.has(key)) map.set(key, []);
-            map.get(key).push(t);
-          }
-          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0],'ru'));
-        }
+function installHandlers(){
+  const toggle = $id('tablePickerToggle');
+  const menu = $id('tablePickerMenu');
+  const search = $id('tableSearch');
+  const groupsEl = $id('tableGroups');
 
-        function renderGroups(){
-          const groupsEl = $id('tableGroups');
-          const byLetter = groupTablesByLetter(tables);
-          groupsEl.innerHTML = byLetter.map(([letter, items]) => `
-            <section class="group" data-letter="${letter}">
-              <div class="group-header">
-                <div class="group-title">${letter}</div>
-                <div class="group-actions">
-                  <button type="button" class="group-select" data-letter="${letter}">Все</button>
-                  <button type="button" class="group-clear" data-letter="${letter}">Сброс</button>
-                </div>
-              </div>
-              <div class="group-items">
-                ${items.map(name => `
-                  <label class="group-item">
-                    <input type="checkbox" data-table="${name}"/>
-                    <span>${name}</span>
-                  </label>
-                `).join('')}
-              </div>
-            </section>
-          `).join('');
-        }
+  toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
+  document.addEventListener('click', e=>{
+    if(!menu.contains(e.target) && !toggle.contains(e.target)) menu.classList.remove('open');
+  });
 
-        function enableFilters(enabled){
-          $id('startDate').disabled = !enabled;
-          $id('endDate').disabled = !enabled;
-          $id('applyFilterBtn').disabled = !enabled;
-          $id('resetFilterBtn').disabled = !enabled;
-          $id('filterInfo').textContent = enabled
-            ? `Выбрана таблица: ${currentTable}. Можете задать даты и нажать «Применить фильтр».`
-            : 'Сначала выберите таблицу слева. После выбора таблицы станет доступен фильтр по датам.';
-        }
+  search.addEventListener('input', ()=>{
+    const q = search.value.toLowerCase();
+    for(const item of groupsEl.querySelectorAll('.group-item')){
+      item.style.display = item.textContent.toLowerCase().includes(q)?'':'none';
+    }
+  });
 
-        function collectFilterParams(){
-          const sd = ($id('startDate')?.value || '').trim();
-          const ed = ($id('endDate')?.value || '').trim();
-          const params = new URLSearchParams();
-          if (sd) params.set('startDate', sd);
-          if (ed) params.set('endDate', ed);
-          return params;
-        }
+  groupsEl.addEventListener('click', e=>{
+    const btn = e.target.closest('button.group-select,button.group-clear');
+    if(!btn) return;
+    const letter = btn.dataset.letter;
+    const section = groupsEl.querySelector(`.group[data-letter="${letter}"]`);
+    const check = btn.classList.contains('group-select');
+    for(const cb of section.querySelectorAll('input[type="checkbox"]')) cb.checked = check;
+  });
 
-        function renderSelectedButtons(names){
-          const box = $id('selectedTables');
-          if(!names || names.length === 0){
-            box.innerHTML = '<div class="hint">Пока ничего не выбрано</div>';
-            currentTable = null;
-            enableFilters(false);
-            $id('content').innerHTML = '<div class="hint">Выберите таблицу слева, затем задайте даты и нажмите «Применить фильтр».</div>';
-            return;
-          }
-          names.sort((a,b)=>a.localeCompare(b,'ru'));
-          box.innerHTML = names.map(name=>`
-            <button class="selected-btn" data-table="${name}">
-              ${name}
-              <span class="selected-remove" data-remove="${name}">✕</span>
-            </button>
-          `).join('');
+  $id('selectAllBtn').addEventListener('click',()=>{
+    for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = true;
+  });
+  $id('clearAllBtn').addEventListener('click',()=>{
+    for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = false;
+  });
+  $id('applySelectionBtn').addEventListener('click',()=>{
+    const selected = Array.from(groupsEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.table);
+    renderSelectedButtons(selected);
+    menu.classList.remove('open');
+  });
 
-          box.querySelectorAll('.selected-btn').forEach(btn=>{
-            btn.addEventListener('click', e=>{
-              const rm = e.target.closest('[data-remove]');
-              if(rm){
-                const removed = rm.dataset.remove;
-                const rest = names.filter(n => n !== removed);
-                renderSelectedButtons(rest);
+  $id('applyFilterBtn').addEventListener('click', ()=>{
+    if(!currentTable){ alert('Сначала выберите таблицу.'); return; }
+    lastLoadedWithFilter = true;
+    loadTable(currentTable, false);
+  });
 
-                // Снимаем галочку в выпадающем списке
-                const checkbox = document.querySelector(`input[data-table="${removed}"]`);
-                if (checkbox) checkbox.checked = false;
+  $id('resetFilterBtn').addEventListener('click', ()=>{
+    $id('startDate').value = '';
+    $id('endDate').value = '';
+    enableFilters(!!currentTable);
+  });
+}
 
-                // Если удалили активную таблицу — сбросить данные и фильтры
-                if (currentTable === removed) {
-                  currentTable = null;
-                  enableFilters(false);
-                  $id('content').innerHTML = '<div class="hint">Выберите таблицу слева, затем задайте даты и нажмите «Применить фильтр».</div>';
-                }
-                return;
-              }
+function setExportEnabled(enabled){
+  const btn = document.getElementById('exportBtn');
+  if (!btn) return;
+  btn.disabled = !enabled;
+}
 
-              // Клик по таблице — загрузка без фильтра
-              currentTable = btn.dataset.table;
-              lastLoadedWithFilter = false;
-              enableFilters(true);
-              loadTable(currentTable, true);
-            });
-          });
-        }
+async function loadTable(table, initial){
+  const content = $id('content');
+  content.innerHTML = `<div class="spinner">Загрузка данных из ${escapeHtml(table)}…</div>`;
+  setExportEnabled(false);
 
-        function installHandlers(){
-          const toggle = $id('tablePickerToggle');
-          const menu = $id('tablePickerMenu');
-          const search = $id('tableSearch');
-          const groupsEl = $id('tableGroups');
+  try{
+    const base = `${dataBaseUrl}&table=${encodeURIComponent(table)}`;
+    const url = initial ? base : `${base}&${collectFilterParams().toString()}`;
 
-          toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
-          document.addEventListener('click', e=>{
-            if(!menu.contains(e.target) && !toggle.contains(e.target)) menu.classList.remove('open');
-          });
+    const res = await fetch(url);
+    const data = await res.json();
 
-          search.addEventListener('input', ()=>{
-            const q = search.value.toLowerCase();
-            for(const item of groupsEl.querySelectorAll('.group-item')){
-              item.style.display = item.textContent.toLowerCase().includes(q)?'':'none';
-            }
-          });
+    const sd = ($id('startDate')?.value || '').trim().replace(/-/g, '.');
+    const ed = ($id('endDate')?.value || '').trim().replace(/-/g, '.');
+    const filterBadge = (!initial && (sd || ed))
+      ? `<span class="hint">Фильтр: ${sd || '...'} - ${ed || '...'}</span>`
+      : `<span class="hint">Без фильтра</span>`;
 
-          groupsEl.addEventListener('click', e=>{
-            const btn = e.target.closest('button.group-select,button.group-clear');
-            if(!btn) return;
-            const letter = btn.dataset.letter;
-            const section = groupsEl.querySelector(`.group[data-letter="${letter}"]`);
-            const check = btn.classList.contains('group-select');
-            for(const cb of section.querySelectorAll('input[type="checkbox"]')) cb.checked = check;
-          });
+    if (!Array.isArray(data) || data.length===0){
+      content.innerHTML = `
+        <h3>${escapeHtml(table)} ${filterBadge}</h3>
+        <div class="toolbar">
+          <button id="exportBtn" class="btn" disabled onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+        </div>
+        <p class="hint">Нет данных.</p>`;
+      return;
+    }
 
-          $id('selectAllBtn').addEventListener('click',()=>{
-            for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = true;
-          });
-          $id('clearAllBtn').addEventListener('click',()=>{
-            for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = false;
-          });
-          $id('applySelectionBtn').addEventListener('click',()=>{
-            const selected = Array.from(groupsEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.table);
-            renderSelectedButtons(selected);
-            menu.classList.remove('open');
-          });
+    const columns = Object.keys(data[0]);
+    const thead = `<thead><tr>${columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+    const tbody = `<tbody>${data.map(row=>`<tr>${columns.map(c=>`<td>${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
 
-          $id('applyFilterBtn').addEventListener('click', ()=>{
-            if(!currentTable){ alert('Сначала выберите таблицу.'); return; }
-            lastLoadedWithFilter = true;
-            loadTable(currentTable, false);
-          });
+    content.innerHTML = `
+      <h3>${escapeHtml(table)} ${filterBadge}</h3>
+      <div class="toolbar">
+        <button id="exportBtn" class="btn" onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+      </div>
+      <div class="table-wrap"><table>${thead}${tbody}</table></div>`;
+    setExportEnabled(true);
+  } 
+  catch(err){
+    content.innerHTML = `<div class="error">Ошибка: ${escapeHtml(err.message)}</div>`;
+    setExportEnabled(false);
+  }
+}
 
-          $id('resetFilterBtn').addEventListener('click', ()=>{
-            $id('startDate').value = '';
-            $id('endDate').value = '';
-            enableFilters(!!currentTable);
-          });
-        }
 
-        function setExportEnabled(enabled){
-          const btn = document.getElementById('exportBtn');
-          if (!btn) return;
-          btn.disabled = !enabled;
-        }
+// =============================
+//       МОДАЛЬНОЕ ОКНО
+// =============================
 
-        async function loadTable(table, initial){
-          const content = $id('content');
-          content.innerHTML = `<div class="spinner">Загрузка данных из ${escapeHtml(table)}…</div>`;
-          setExportEnabled(false);
+// CSS стилы для модалки
+(function addModalStyles(){
+    const css = `
+    .export-modal {
+        display: none;
+        position: fixed;
+        z-index: 99999;
+        inset: 0;
+        background: rgba(0,0,0,0.45);
+        backdrop-filter: blur(2px);
+        justify-content: center;
+        align-items: center;
+    }
+    .export-modal.open {
+        display: flex;
+    }
+    .export-modal-box {
+        background: #fff;
+        padding: 25px 35px;
+        border-radius: 8px;
+        font-size: 18px;
+        text-align: center;
+        box-shadow: 0 0 20px rgba(0,0,0,0.3);
+    }
+    .export-spinner {
+        width: 36px;
+        height: 36px;
+        border: 4px solid #ccc;
+        border-top-color: #3498db;
+        border-radius: 50%;
+        margin: 0 auto 15px;
+        animation: spinModal 0.7s linear infinite;
+    }
+    @keyframes spinModal { to { transform: rotate(360deg); } }
+    `;
+    const style = document.createElement("style");
+    style.textContent = css;
+    document.head.appendChild(style);
+})();
 
-          try{
-            const base = `${dataBaseUrl}&table=${encodeURIComponent(table)}`;
-            const url = initial ? base : `${base}&${collectFilterParams().toString()}`;
+// создаём модалку
+const exportModal = document.createElement("div");
+exportModal.className = "export-modal";
+exportModal.innerHTML = `
+    <div class="export-modal-box">
+        <div class="export-spinner"></div>
+        <div>Пожалуйста, подождите…</div>
+    </div>
+`;
+document.body.appendChild(exportModal);
 
-            const res = await fetch(url);
-            const text = await res.text();
-            const data = JSON.parse(text);
+function showExportModal(){
+    exportModal.classList.add("open");
+}
+function hideExportModal(){
+    exportModal.classList.remove("open");
+}
 
-            const sd = ($id('startDate')?.value || '').trim().replace(/-/g, '.');
-            const ed = ($id('endDate')?.value || '').trim().replace(/-/g, '.');
-            const filterBadge = (!initial && (sd || ed))
-              ? `<span class="hint">Фильтр: ${sd || '...'} - ${ed || '...'}</span>`
-              : `<span class="hint">Без фильтра</span>`;
 
-            if (!Array.isArray(data) || data.length===0){
-              content.innerHTML = `
-                <h3>${escapeHtml(table)} ${filterBadge}</h3>
-                <div class="toolbar">
-                  <button id="exportBtn" class="btn" disabled onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
-                </div>
-                <p class="hint">Нет данных${(!initial && (sd||ed)) ? ' за выбранный период' : ''}.</p>`;
-              return;
-            }
+// =============================
+//  ПЕРЕОПРЕДЕЛЁННЫЙ exportExcel
+// =============================
 
-            const columns = Object.keys(data[0]);
-            const thead = `<thead><tr>${columns.map(c=>`<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
-            const tbody = `<tbody>${data.map(row=>`<tr>${columns.map(c=>`<td>${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+window.exportExcel = async function(table){
+    const btn = document.getElementById('exportBtn');
+    if (btn && btn.disabled) return;
 
-            content.innerHTML = `
-              <h3>${escapeHtml(table)} ${filterBadge}</h3>
-              <div class="toolbar">
-                <button id="exportBtn" class="btn" onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
-              </div>
-              <div class="table-wrap"><table>${thead}${tbody}</table></div>`;
-            setExportEnabled(true);
-          } catch(err){
-            content.innerHTML = `<div class="error">Ошибка: ${escapeHtml(err.message)}</div>`;
-            setExportEnabled(false);
-          }
-        }
+    showExportModal(); // показываем окно
 
-        async function exportExcel(table){
-          const btn = document.getElementById('exportBtn');
-          if (btn && btn.disabled) return;
+    const base = `${exportBaseUrl}&table=${encodeURIComponent(table)}`;
+    const url  = lastLoadedWithFilter ? `${base}&${collectFilterParams().toString()}` : base;
 
-          const base = `${exportBaseUrl}&table=${encodeURIComponent(table)}`;
-          const url  = lastLoadedWithFilter ? `${base}&${collectFilterParams().toString()}` : base;
+    try{
+        const resp = await fetch(url);
+        const cd = resp.headers.get('Content-Disposition') || '';
 
-          const resp = await fetch(url);
-          const cd = resp.headers.get('Content-Disposition') || '';
-          const name = parseFilenameFro.selected-removemCD(cd) || `${table}_${formatNowForFile()}.xlsx`;
-          const blob = await resp.blob();
-          const blobUrl = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = blobUrl; a.download = name; document.body.appendChild(a); a.click(); a.sremove();
-          URL.revokeObjectURL(blobUrl);
-        }
+        const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+        const raw = m ? (m[1] || m[2]) : null;
+        const name = raw ? decodeURIComponent(raw) : `${table}_${formatNowForFile()}.xlsx`;
 
-        renderGroups();
-        installHandlers();
-        enableFilters(false);
-        renderSelectedButtons([]);
-        window.exportExcel = exportExcel;
-    </script>
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+
+        const a = document.createElement('a');
+        a.href = blobUrl;
+        a.download = name;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        URL.revokeObjectURL(blobUrl);
+    }
+    catch(err){
+        alert("Ошибка: " + err.message);
+    }
+    finally{
+        hideExportModal(); // скрываем окно
+    }
+};
+
+
+// запуск
+renderGroups();
+installHandlers();
+enableFilters(false);
+renderSelectedButtons([]);
+window.exportExcel = exportExcel;
+</script>
