@@ -1,6 +1,5 @@
 @page
 @model IndexModel
-
 @{
     ViewData["Title"] = "OTCH";
     Layout = null;
@@ -29,8 +28,8 @@
                     <div class="dropdown-groups" id="tableGroups"></div>
 
                     <div class="dropdown-actions">
-                        <button id="selectAllBtn">Выбрать все</button>
-                        <button id="clearAllBtn">Сбросить все</button>
+                        <button id="selectAllBtn" class="btn">Выбрать все</button>
+                        <button id="clearAllBtn" class="btn">Сбросить все</button>
                         <button id="applySelectionBtn" class="btn">Применить</button>
                     </div>
                 </div>
@@ -39,27 +38,18 @@
             <div class="selected-wrap">
                 <div class="selected-title">Выбранные таблицы</div>
                 <div class="selected-list" id="selectedTables">
-                    <div class="hint-p">Пока ничего не выбрано</div>
+                    <div class="hint-p">Ничего не выбрано</div>
                 </div>
             </div>
+
         </aside>
 
         <main class="content">
 
-
-
-            <div style="margin-bottom:10px;">
-                <h4>Конструктор SQL-запроса</h4>
-                <textarea id="sqlQuery" rows="4" style="width:100%;" placeholder="Введите SQL (только SELECT)"></textarea>
-                <br>
-                <button id="runSqlBtn">Выполнить SQL</button>
-            </div>
-
-
             <h3>Фильтр</h3>
 
             <div class="hint" id="filterInfo">
-                Сначала выберите таблицу слева. После выбора таблицы станет доступен фильтр по датам.
+                Сначала выберите таблицу слева.
             </div>
 
             <div class="toolbar">
@@ -79,7 +69,7 @@
             </div>
 
 
-            <div id="nPartWrap" style="display:none;">
+            @* <div id="nPartWrap" style="display:none;">
                 <label>N_PART:</label>
                 <input type="text" id="nPart" placeholder="номер партии" />
             </div>
@@ -88,11 +78,11 @@
                 <label>N_PLAW:</label>
                 <input type="text" id="nPlaw" placeholder="номер плавки" />
             </div>
-
+ *@
 
             <h3>Данные</h3>
             <div id="content">
-                <div class="hint">Выберите таблицу слева, затем задайте даты и нажмите «Применить фильтр».</div>
+                <div class="hint">Выберите таблицу слева.</div>
             </div>
         </main>
     </div>
@@ -100,9 +90,32 @@
 
 
     <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.selected-btn');
+            if (!btn) return;
+
+            const container = btn.closest('.selected-list') || btn.parentElement || document;
+
+
+            container.querySelectorAll('.selected-btn.active').forEach(b => {
+              if (b !== btn) {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+              }
+            });
+
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+            btn.setAttribute('role', 'button');
+          });
+        });
+    </script>
+
+    <script>
         const dataBaseUrl   = '@Url.Page("./Index", "Data")';
         const exportBaseUrl = '@Url.Page("./Index", "Export")';
-
+        const tablesStateUrl = '@Url.Page("./Index", "TablesState")';
         const tables = [
             "lnpp.ANGA_OTK","lnpp.AUO_OPXR","lnpp.BMC_1_2","lnpp.DATACENTR","lnpp.DATACENTR_OLD","lnpp.EXCEL3","lnpp.GEST","lnpp.JA_1","lnpp.JA_2","lnpp.JASH_1",
         "lnpp.JASH_1_DUBL","lnpp.JASH_2","lnpp.JASH_2_DUBL","lnpp.LAB_LNPP","lnpp.LNGC_DATACENTR","lnpp.LNGC_OTK","lnpp.LNGC_OTK_DUBLE","lnpp.LPC3_MM",
@@ -155,7 +168,6 @@
         const $id = (id) => document.getElementById(id);
 
         const escapeHtml = (s) => String(s)
-          .replace(/&/g, '&amp;')
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
@@ -196,7 +208,7 @@
 
         async function getTablesMeta() {
             try {
-                const res = await fetch('/Index?handler=TablesState');
+                const res = await fetch(`${tablesStateUrl}`);
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 return await res.json(); 
             } catch (err) {
@@ -232,7 +244,7 @@
                     <div class="group-items">
                         ${names.map(name => `
                             <label class="group-item">
-                                <input type="checkbox" data-table="${name}"/>
+                                <input type="checkbox" class="table-checkbox" data-table="${name}"/>
                                 <span>${name}</span>
                             </label>
                         `).join('')}
@@ -254,10 +266,6 @@
             if (resetBtn)  resetBtn.disabled  = !enabled;
             if (info) info.textContent = enabled ? `Выбрана таблица: ${currentTable}.` : 'Сначала выберите таблицу слева.';
 
-            const sqlBox   = $id('sqlQuery');
-            const runSqlBtn= $id('runSqlBtn');
-            if (sqlBox)    sqlBox.disabled    = !enabled;
-            if (runSqlBtn) runSqlBtn.disabled = !enabled;
 
             // Показ/скрытие N_PART / N_PLAW при наличии таких столбцов (если используете эти поля)
             syncExtraFilters(currentTable);
@@ -293,10 +301,11 @@
             return params;
         }
 
+
         function renderSelectedButtons(names){
             const box = $id('selectedTables');
             if(!names || names.length===0){
-                box.innerHTML = '<div class="hint-p">Пока ничего не выбрано</div>';
+                box.innerHTML = '<div class="hint-p">Ничего не выбрано</div>';
                 currentTable = null;
                 enableFilters(false);
                 $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
@@ -323,12 +332,25 @@
                             currentTable = null;
                             enableFilters(false);
                             $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+                            const s = document.getElementById('startDate');
+                            const e2 = document.getElementById('endDate');
+                            if (s) s.value = '';
+                            if (e2) e2.value = '';
                         }
                         return;
                     }
+
                     currentTable = btn.dataset.table;
                     lastLoadedWithFilter = false;
+
                     enableFilters(true);
+
+                    const s = document.getElementById('startDate');
+                    const e2 = document.getElementById('endDate');
+                    if (s) s.value = '';
+                    if (e2) e2.value = '';
+                    if (typeof currentOffset !== 'undefined') currentOffset = 0;
+
                     loadTable(currentTable, true);
                 });
             });
@@ -340,7 +362,6 @@
             const search   = $id('tableSearch');
             const groupsEl = $id('tableGroups');
 
-            // Открытие/закрытие меню выбора таблиц
             if (toggle) {
                 toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
                 document.addEventListener('click', e=>{
@@ -348,7 +369,6 @@
                 });
             }
 
-            // Поиск по списку таблиц
             if (search) {
                 search.addEventListener('input', ()=>{
                     const q = search.value.toLowerCase();
@@ -367,7 +387,6 @@
                 for(const cb of section.querySelectorAll('input[type="checkbox"]')) cb.checked = check;
             });
 
-            // Выбрать все / очистить все (по всем группам)
             const selectAllBtn = $id('selectAllBtn');
             const clearAllBtn  = $id('clearAllBtn');
             if (selectAllBtn) selectAllBtn.addEventListener('click',()=>{
@@ -377,7 +396,6 @@
                 for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = false;
             });
 
-            // Применить выбор таблиц
             const applySelectionBtn = $id('applySelectionBtn');
             if (applySelectionBtn) applySelectionBtn.addEventListener('click',()=>{
                 const selected = Array.from(groupsEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.table);
@@ -385,7 +403,6 @@
                 if (menu) menu.classList.remove('open');
             });
 
-            // Применить/сброс фильтра (по датам + доп. поля)
             const applyFilterBtn = $id('applyFilterBtn');
             const resetFilterBtn = $id('resetFilterBtn');
             if (applyFilterBtn) applyFilterBtn.addEventListener('click', ()=>{
@@ -406,135 +423,6 @@
                 enableFilters(!!currentTable);
             });
 
-            // Конструктор SQL
-
-        const runSqlBtn = $id('runSqlBtn');
-        let observer; 
-        let pagingState = null; 
-
-        if (runSqlBtn) {
-          runSqlBtn.addEventListener('click', async () => {
-            const sqlBox = $id('sqlQuery');
-            const sql = (sqlBox?.value || '').trim();
-            if (!sql) { showErrorModal('Введите SQL-запрос!'); return; }
-            if (!sql.toUpperCase().startsWith('SELECT')) { showErrorModal('Разрешены только SELECT-запросы.'); return; }
-            if (!currentTable) { showErrorModal('Сначала выберите таблицу слева.'); return; }
-
-            const content = $id('content');
-            content.innerHTML = `
-              <h3>Результат SQL</h3>
-              <div class="toolbar">
-                <button id="exportBtn" class="btn" disabled>Экспорт в Excel</button>
-              </div>
-              <div class="table-wrap" id="tableWrap">
-                <div class="spinner">Загрузка...</div>
-                <table>
-                  <thead id="sqlThead"></thead>
-                  <tbody id="sqlTbody"></tbody>
-                </table>
-                <div id="scrollSentinel" style="height: 1px;"></div>
-              </div>
-              <p class="hint" id="emptyHint" style="display:none;">Нет данных.</p>
-            `;
-            setExportEnabled(false);
-
-            if (observer) {
-              observer.disconnect();
-              observer = null;
-            }
-
-            pagingState = {
-              sql,
-              page: 1,
-              pageSize: 100, 
-              loading: false,
-              hasMore: true,
-              columns: null
-            };
-
-            const exportBtn = $id('exportBtn');
-            exportBtn.onclick = () => exportExcelSql(escapeAttr(sql)); 
-
-            const thead = $id('sqlThead');
-            const tbody = $id('sqlTbody');
-            const wrap = $id('tableWrap');
-            const sentinel = $id('scrollSentinel');
-            const emptyHint = $id('emptyHint');
-
-            async function loadPage() {
-              if (pagingState.loading || !pagingState.hasMore) return;
-              pagingState.loading = true;
-
-              const spinnerEl = wrap.querySelector('.spinner');
-              if (spinnerEl) spinnerEl.style.display = 'block';
-
-              try {
-                const url = `/Index?handler=RunSqlPaged&sql=${encodeURIComponent(pagingState.sql)}&currentTable=${encodeURIComponent(currentTable)}&page=${pagingState.page}&pageSize=${pagingState.pageSize}`;
-                const res = await fetch(url);
-                const data = await res.json();
-
-                if (data.error) {
-                  showErrorModal('Ошибка выполнения SQL: ' + data.error);
-                  wrap.innerHTML = `<div class="error">${escapeHtml(data.error)}</div>`;
-                  pagingState.loading = false;
-                  pagingState.hasMore = false;
-                  return;
-                }
-
-                const rows = data.rows || [];
-                const columns = data.columns || (rows.length ? Object.keys(rows[0]) : []);
-
-                if (!pagingState.columns) {
-                  pagingState.columns = columns;
-                  thead.innerHTML = `<tr>${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr>`;
-                }
-
-                if (rows.length) {
-                  const frag = document.createDocumentFragment();
-                  rows.forEach(row => {
-                    const tr = document.createElement('tr');
-                    tr.innerHTML = pagingState.columns.map(c => `<td>${escapeHtml(formatValue(row[c]))}</td>`).join('');
-                    frag.appendChild(tr);
-                  });
-                  tbody.appendChild(frag);
-
-                  setExportEnabled(true);
-                  exportBtn.disabled = false;
-                } else if (pagingState.page === 1) {
-                  emptyHint.style.display = 'block';
-                }
-
-                pagingState.hasMore = !!data.hasMore;
-                pagingState.page += 1;
-
-              } catch (err) {
-                showErrorModal('Ошибка загрузки данных: ' + err.message);
-                wrap.insertAdjacentHTML('beforeend', `<div class="error">Ошибка: ${escapeHtml(err.message)}</div>`);
-                pagingState.hasMore = false;
-              } finally {
-                const spinnerEl = wrap.querySelector('.spinner');
-                if (spinnerEl) spinnerEl.style.display = 'none';
-                pagingState.loading = false;
-              }
-            }
-
-            await loadPage();
-
-            observer = new IntersectionObserver((entries) => {
-              for (const entry of entries) {
-                if (entry.isIntersecting && pagingState.hasMore && !pagingState.loading) {
-                  loadPage();
-                }
-              }
-            }, {
-              root: wrap,         
-              rootMargin: '200px',
-              threshold: 0.1
-            });
-
-            observer.observe(sentinel);
-          });
-        }
 }
 
         function setExportEnabled(enabled){
@@ -645,20 +533,20 @@
             const np = ($id('nPart')?.value     || '').trim();
             const nl = ($id('nPlaw')?.value     || '').trim();
 
-            const hasAnyFilter = (!initial) && (sd || ed || np || nl);
-            const filterBadge = hasAnyFilter
-              ? `<span class="hint">Фильтр: ${sd || 'Не указана дата от'} - ${ed || 'Не указана дата до'}${(np||nl)?`, N_PART=${np||'Не указано'}, N_PLAW=${nl||'Не указано'}`:''}</span>`
-              : `<span class="hint">Без фильтра</span>`;
+            // const hasAnyFilter = (!initial) && (sd || ed || np || nl);
+            // const filterBadge = hasAnyFilter
+            //   ? `<span class="hint">Фильтр: ${sd || 'Не указана дата от'} - ${ed || 'Не указана дата до'}${(np||nl)?`, N_PART=${np||'Не указано'}, N_PLAW=${nl||'Не указано'}`:''}</span>`
+            //   : `<span class="hint">Без фильтра</span>`;
 
             const rows = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
             if (!Array.isArray(rows) || rows.length === 0) {
               content.innerHTML = `
-                <h3>${escapeHtml(table)} ${filterBadge}</h3>
+                
                 <div class="toolbar">
                   <button id="exportBtn" class="btn" disabled onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
                 </div>
                 <p class="hint">Нет данных.</p>`;
-              return;
+              return; //esli nado to vernyt posle innerhtml <h3>${escapeHtml(table)} ${filterBadge}</h3>
             }
 
             const columns = Object.keys(rows[0]);
@@ -666,12 +554,12 @@
             const tbody = `<tbody id="tbody-main">${rows.map(row => `<tr>${columns.map(c => `<td>${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
 
             content.innerHTML = `
-              <h3>${escapeHtml(table)} ${filterBadge}</h3>
+              
               <div class="toolbar">
                 <button id="exportBtn" class="btn" onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
               </div>
               <div class="table-wrap"><table>${thead}${tbody}</table></div>
-            `;
+                    `; //esli nado to vernyt posle innerhtml<h3>${escapeHtml(table)} ${filterBadge}</h3>
             setExportEnabled(true);
 
             inf.offset = Array.isArray(data)
@@ -730,26 +618,58 @@
             }
         };
 
+
         window.exportExcel = async function(table) {
           showExportModal();
           try {
             const p = collectFilterParams();
-            p.set('table', table);
+            if (table) p.set('table', table);
 
-            const url = `Index?handler=Export&${p.toString()}`;
+            const sep = exportBaseUrl.includes('?') ? '&' : '?';
+            const url = `${exportBaseUrl}${sep}${p.toString()}`;
 
-            const resp = await fetch(url);
+            const resp = await fetch(url, { method: 'GET' });
+
             if (!resp.ok) {
-              throw new Error(`HTTP ${resp.status} ${resp.statusText}`);
+              let msg = `HTTP ${resp.status} ${resp.statusText}`;
+              try {
+                const text = await resp.text();
+                if (text) msg += `\n\n${text}`;
+              } catch {}
+              throw new Error(msg);
             }
 
             const cd = resp.headers.get('Content-Disposition') || '';
             const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
             const raw = m ? (m[1] || m[2]) : null;
-            const name = raw ? decodeURIComponent(raw) : `${(table||'export').replace(/[^\w.-]+/g,'_')}_${formatNowForFile()}.xlsx`;
+            const name = raw
+              ? decodeURIComponent(raw)
+              : `${(table || 'export').replace(/[^\w.-]+/g,'_')}_${formatNowForFile()}.xlsx`;
 
             const blob = await resp.blob();
-            const blobUrl = URL.createObjectURL(blob);
+
+            const buf = await blob.arrayBuffer();
+            const u8 = new Uint8Array(buf);
+            const isZip = u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4B && u8[2] === 0x03 && u8[3] === 0x04;
+
+            if (!isZip) {
+              let preview = '';
+              try {
+                const text = new TextDecoder('utf-8').decode(u8.subarray(0, Math.min(4000, u8.length)));
+                preview = text;
+              } catch {}
+              throw new Error(
+                'Сервер вернул не XLSX. Проверьте логи.\n' +
+                'Content-Type: ' + (resp.headers.get('Content-Type') || 'unknown') + '\n\n' +
+                (preview ? preview : '(пустой/нечитаемый ответ)')
+              );
+            }
+
+            const okBlob = new Blob([buf], {
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+
+            const blobUrl = URL.createObjectURL(okBlob);
             const a = document.createElement('a');
             a.href = blobUrl;
             a.download = name;
@@ -758,36 +678,16 @@
             a.remove();
             URL.revokeObjectURL(blobUrl);
           } catch (err) {
-            showErrorModal('Ошибка экспорта данных: ' + (err?.message || err));
+            console.error(err);
+            showErrorModal('Ошибка экспорта: ' + (err?.message || err));
           } finally {
             hideExportModal();
           }
         };
 
-        window.exportExcelSql = async function(sql){
-            showExportModal();
-            try {
-                const url = `/Index?handler=ExportSql&sql=${encodeURIComponent(sql)}&currentTable=${encodeURIComponent(currentTable)}`;
-                const resp = await fetch(url);
-                const cd = resp.headers.get('Content-Disposition') || '';
-                const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-                const raw = m ? (m[1] || m[2]) : null;
-                const name = raw ? decodeURIComponent(raw) : `SQL_${formatNowForFile()}.xlsx`;
-                const blob = await resp.blob();
-                const blobUrl = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = blobUrl;
-                a.download = name;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(blobUrl);
-            } catch (err){
-                showErrorModal('Ошибка экспорта данных: ' + err.message);
-            } finally{
-                hideExportModal();
-            }
-        };
+
+       
+
 
         function formatNowForFile(){
             const d = new Date();
