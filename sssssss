@@ -1,99 +1,209 @@
-/* ============================================================
-   СОХРАНЕНИЕ / ВОССТАНОВЛЕНИЕ selected-btn и group-item
-============================================================ */
+/* ===========================
+   Надёжное сохранение state
+   - selected-btn (в #selectedTables)
+   - group-item (input.table-checkbox)
+   =========================== */
 
-// ----- Работа с LocalStorage -----
+(function () {
+  const STORAGE_KEY = 'my_app_selected_tables_v1';
 
-function saveSelectedTables(list) {
-    localStorage.setItem("selectedTables", JSON.stringify(list));
-}
+  // --- утилиты ---
+  const byId = id => document.getElementById(id);
+  const qsAll = sel => Array.from(document.querySelectorAll(sel));
+  const qs = sel => document.querySelector(sel);
 
-function loadSelectedTables() {
+  function saveState(obj) {
     try {
-        return JSON.parse(localStorage.getItem("selectedTables")) || [];
-    } catch {
-        return [];
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(obj));
+    } catch (e) {
+      console.warn('saveState failed', e);
     }
-}
+  }
 
-// ----- Получить отмеченные чекбоксы -----
-
-function getCheckedTables() {
-    return Array.from(document.querySelectorAll(".table-checkbox:checked"))
-        .map(cb => cb.dataset.table);
-}
-
-// ----- Обновить UI: кнопки selected-btn -----
-
-function renderSelectedButtons(list) {
-    const box = document.getElementById("selectedTables");
-
-    if (!list.length) {
-        box.innerHTML = `<div class="hint-p">Ничего не выбрано</div>`;
-        return;
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : { checked: [], buttons: [] };
+    } catch (e) {
+      return { checked: [], buttons: [] };
     }
+  }
 
-    list.sort((a, b) => a.localeCompare(b, "ru"));
+  // --- дебаунс для сохранения ---
+  let saveTimer = null;
+  function scheduleSave() {
+    if (saveTimer) clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const checked = qsAll('.table-checkbox:checked').map(cb => cb.dataset.table).filter(Boolean);
+      const buttons = (byId('selectedTables') ? Array.from(byId('selectedTables').querySelectorAll('.selected-btn')) : [])
+                        .map(b => b.dataset.table).filter(Boolean);
+      saveState({ checked, buttons });
+      saveTimer = null;
+    }, 150); // короткая задержка
+  }
 
-    box.innerHTML = list.map(t => `
-        <button class="selected-btn" data-table="${t}">
-            ${t}
-            <span class="selected-remove" data-remove="${t}">✕</span>
-        </button>
-    `).join("");
+  // --- рендер buttons в #selectedTables из списка таблиц ---
+  function renderSelectedButtons(list) {
+    const container = byId('selectedTables');
+    if (!container) return;
+    if (!Array.isArray(list) || list.length === 0) {
+      container.innerHTML = '<div class="hint-p">Ничего не выбрано</div>';
+      return;
+    }
+    const sorted = [...list].sort((a,b)=>a.localeCompare(b,'ru'));
+    container.innerHTML = sorted.map(t => `
+      <button class="selected-btn" data-table="${t}">
+        ${t}
+        <span class="selected-remove" data-remove="${t}">✕</span>
+      </button>
+    `).join('');
+  }
 
-    // обработка кликов
-    box.querySelectorAll(".selected-btn").forEach(btn => {
-        btn.onclick = e => {
-            const remove = e.target.closest(".selected-remove");
-            const table = btn.dataset.table;
+  // --- восстановить чекбоксы согласно state.checked ---
+  function restoreCheckboxes(checkedList) {
+    if (!Array.isArray(checkedList)) return;
+    for (const cb of qsAll('.table-checkbox')) {
+      const val = cb.dataset.table;
+      cb.checked = checkedList.includes(val);
+    }
+  }
 
-            if (remove) {
-                // удалить из списка
-                const updated = list.filter(x => x !== table);
+  // --- синхронизировать кнопки и чекбоксы: если кнопки заданы, поставить соответствующие чекбоксы ---
+  function syncButtonsAndCheckboxes(state) {
+    // Приоритет — state.checked (если есть). Если пусто, используем state.buttons.
+    if (Array.isArray(state.checked) && state.checked.length) {
+      restoreCheckboxes(state.checked);
+      renderSelectedButtons(state.checked);
+    } else if (Array.isArray(state.buttons) && state.buttons.length) {
+      // поставить галочки тем чекбоксам, которые есть в buttons
+      for (const cb of qsAll('.table-checkbox')) {
+        cb.checked = state.buttons.includes(cb.dataset.table);
+      }
+      renderSelectedButtons(state.buttons);
+    } else {
+      // ничего — очистим
+      for (const cb of qsAll('.table-checkbox')) cb.checked = false;
+      renderSelectedButtons([]);
+    }
+  }
 
-                // снять чекбокс
-                const cb = document.querySelector(`.table-checkbox[data-table="${table}"]`);
-                if (cb) cb.checked = false;
+  // --- обработчик делегированного клика внутри #selectedTables (удаление кнопки) ---
+  function onSelectedListClick(e) {
+    const remove = e.target.closest('.selected-remove');
+    if (!remove) return;
+    const table = remove.dataset.remove;
+    if (!table) return;
 
-                saveSelectedTables(updated);
-                renderSelectedButtons(updated);
-            }
-        };
+    // убираем кнопку и снимаем чекбокс
+    const state = loadState();
+    const newButtons = (state.buttons || []).filter(x => x !== table);
+    const newChecked = (state.checked || []).filter(x => x !== table);
+
+    // обновить UI
+    const cb = document.querySelector(`.table-checkbox[data-table="${table}"]`);
+    if (cb) cb.checked = false;
+
+    renderSelectedButtons(newButtons);
+    saveState({ checked: newChecked, buttons: newButtons });
+  }
+
+  // --- отслеживаем изменения чекбоксов (делегирование на container с группами) ---
+  function attachCheckboxDelegation() {
+    const groupsContainer = document.getElementById('tableGroups') || document.body;
+    groupsContainer.addEventListener('change', function (e) {
+      const cb = e.target;
+      if (!cb || !cb.classList || !cb.classList.contains('table-checkbox')) return;
+      // при изменении чекбокса — обновляем кнопки и планируем save
+      const checked = qsAll('.table-checkbox:checked').map(x => x.dataset.table).filter(Boolean);
+      renderSelectedButtons(checked);
+      scheduleSave();
     });
-}
+  }
 
-// ----- Назначаем обработчики для group-item (чекбоксов) -----
+  // --- отслеживаем клики по групповым кнопкам (group-select / group-clear) и глобальным selectAll/clearAll/apply ---
+  function attachClickListenersForBulkActions() {
+    // Делегируем документ — ловим любые клики на кнопки которые могут менять чекбоксы
+    document.addEventListener('click', function (e) {
+      const t = e.target;
+      // вполне возможно, что у тебя есть классы group-select, group-clear, selectAllBtn, clearAllBtn, applySelectionBtn
+      if (t.closest('.group-select') || t.closest('.group-clear') ||
+          t.id === 'selectAllBtn' || t.id === 'clearAllBtn' || t.id === 'applySelectionBtn') {
+        // Немного подождём пока рендер группы изменит чекбоксы (если используется синхронный код, timeout 0 всё ровно безопасен)
+        setTimeout(() => {
+          const checked = qsAll('.table-checkbox:checked').map(x => x.dataset.table).filter(Boolean);
+          renderSelectedButtons(checked);
+          scheduleSave();
+        }, 0);
+      }
+    });
+  }
 
-function attachCheckboxHandlers() {
-    for (const cb of document.querySelectorAll(".table-checkbox")) {
-        cb.addEventListener("change", () => {
-            const list = getCheckedTables();
-            saveSelectedTables(list);
-            renderSelectedButtons(list);
-        });
+  // --- MutationObserver: ждет появления .table-checkbox элементов в DOM ---
+  function observeForCheckboxesThenInit() {
+    const root = document.body;
+    const observer = new MutationObserver((mutations, obs) => {
+      // если есть хоть один checkbox — можно инициализировать восстановление и повесить обработчики
+      if (document.querySelector('.table-checkbox')) {
+        obs.disconnect();
+        initAfterCheckboxesReady();
+      }
+    });
+
+    observer.observe(root, { childList: true, subtree: true });
+
+    // на случай если чекбоксы уже присутствуют
+    if (document.querySelector('.table-checkbox')) {
+      observer.disconnect();
+      initAfterCheckboxesReady();
     }
-}
+  }
 
-// ----- ВОССТАНОВЛЕНИЕ после загрузки страницы -----
+  // --- начальная инициализация после того как чекбоксы доступны ---
+  function initAfterCheckboxesReady() {
+    const state = loadState();
 
-function restoreState() {
-    const saved = loadSelectedTables();
+    // Восстановим чекбоксы/кнопки
+    syncButtonsAndCheckboxes(state);
 
-    // восстановить чекбоксы
-    for (const cb of document.querySelectorAll(".table-checkbox")) {
-        cb.checked = saved.includes(cb.dataset.table);
+    // привязки
+    attachCheckboxDelegation();
+
+    // делегирование кликов на selected-list (удаление)
+    const selBox = byId('selectedTables');
+    if (selBox) {
+      selBox.addEventListener('click', onSelectedListClick);
+    } else {
+      // если контейнера нет — отслеживаем появление и затем навешиваем
+      const mo = new MutationObserver((mut, o) => {
+        const sb = byId('selectedTables');
+        if (sb) {
+          sb.addEventListener('click', onSelectedListClick);
+          o.disconnect();
+        }
+      });
+      mo.observe(document.body, { childList: true, subtree: true });
     }
 
-    // восстановить кнопки
-    renderSelectedButtons(saved);
-}
+    attachClickListenersForBulkActions();
 
-/* ============================================================
-   ИНИЦИАЛИЗАЦИЯ
-============================================================ */
+    // Небольшая страховка — если где-то внешний код явно заменит список групп (например, рендерGroups вызывается позже),
+    // мы будем слушать появление/удаление .table-checkbox и восстанавливать состояние заново при необходимости.
+    const topObserver = new MutationObserver((muts) => {
+      // если в DOM появились/удалились .table-checkbox — синхронизируем UI с хранилищем
+      const hasAny = !!document.querySelector('.table-checkbox');
+      if (!hasAny) return;
+      // возьмём сохранённое состояние и применим (это безопасно и idempotent)
+      const s = loadState();
+      syncButtonsAndCheckboxes(s);
+    });
+    topObserver.observe(document.body, { childList: true, subtree: true });
+  }
 
-document.addEventListener("DOMContentLoaded", () => {
-    attachCheckboxHandlers();  // назначаем клики на чекбоксы
-    restoreState();            // восстанавливаем выбранные таблицы
-});
+  // старт — ждем появления чекбоксов
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', observeForCheckboxesThenInit);
+  } else {
+    observeForCheckboxesThenInit();
+  }
+
+})();
