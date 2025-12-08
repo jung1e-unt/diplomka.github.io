@@ -1,159 +1,706 @@
-document.addEventListener("DOMContentLoaded", function () {
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "OTCH";
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>@ViewData["Title"]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="~/css/site.css" rel="stylesheet" />
+</head>
+<body>
 
-    /* -----------------------------------------------
-       LocalStorage: сохранить / загрузить выбранные таблицы
-    -------------------------------------------------*/
+    <div class="layout">
+        <aside class="sidebar">
+            <h3>Таблицы</h3>
 
-    function saveSelectedTablesLocal(names) {
-        localStorage.setItem("selectedTables", JSON.stringify(names));
-    }
+            <div class="dropdown" id="tableDropdown">
+                <button class="dropdown-toggle" id="tablePickerToggle">Выбрать таблицы ▾</button>
+                <div class="dropdown-menu" id="tablePickerMenu">
+                    <div class="dropdown-header">
+                        <input id="tableSearch" class="dropdown-search" type="text" placeholder="Поиск по таблицам" />
+                    </div>
 
-    function loadSelectedTablesLocal() {
-        try {
-            return JSON.parse(localStorage.getItem("selectedTables")) || [];
-        } catch {
-            return [];
-        }
-    }
+                    <div class="dropdown-groups" id="tableGroups"></div>
 
-    /* -----------------------------------------------
-       Получение таблиц из Razor (Model.AllTables)
-    -------------------------------------------------*/
+                    <div class="dropdown-actions">
+                        <button id="selectAllBtn" class="btn">Выбрать все</button>
+                        <button id="clearAllBtn" class="btn">Сбросить все</button>
+                        <button id="applySelectionBtn" class="btn">Применить</button>
+                    </div>
+                </div>
+            </div>
 
-    const groupsData = window.allTables || [];
-    const groupsEl = document.getElementById("groups");
-    const selectedBtnGroup = document.getElementById("selected_tables_btn_group");
-    const applySelectionBtn = document.getElementById("applySelectionBtn");
-    const resetSelectionBtn = document.getElementById("resetSelectionBtn");
-    const menu = document.getElementById("side_menu");
-    const manualSearchInput = document.getElementById("manual_search_input");
-    const fabricSelect = document.getElementById("fabric_select");
+            <div class="selected-wrap">
+                <div class="selected-title">Выбранные таблицы</div>
+                <div class="selected-list" id="selectedTables">
+                    <div class="hint-p">Ничего не выбрано</div>
+                </div>
+            </div>
 
-    /* -----------------------------------------------
-       Рендер групп и чекбоксов из Model.AllTables
-    -------------------------------------------------*/
-    function renderGroups() {
-        groupsEl.innerHTML = "";
+        </aside>
 
-        groupsData.forEach(group => {
-            const groupTitle = document.createElement("h3");
-            groupTitle.textContent = group.groupName;
+        <main class="content">
 
-            const ul = document.createElement("ul");
+            <h3>Фильтр</h3>
 
-            group.tables.forEach(t => {
-                const li = document.createElement("li");
+            <div class="hint" id="filterInfo">
+                Сначала выберите таблицу слева.
+            </div>
 
-                const cb = document.createElement("input");
-                cb.type = "checkbox";
-                cb.dataset.table = t;
-                cb.id = "cb_" + t;
+            <div class="toolbar">
+                <div style="display:flex; gap:8px; width: 100%; max-width: 540px;">
+                    <div style="flex:1;">
+                        <label for="startDate">Дата от</label>
+                        <input id="startDate" type="date" disabled />
+                    </div>
+                    <div style="flex:1;">
+                        <label for="endDate">Дата до</label>
+                        <input id="endDate" type="date" disabled />
+                    </div>
+                </div>
 
-                const label = document.createElement("label");
-                label.textContent = t;
-                label.setAttribute("for", cb.id);
+                <button id="applyFilterBtn" class="btn" disabled>Применить фильтр</button>
+                <button id="resetFilterBtn" class="btn-secondary" disabled>Очистить фильтр</button>
+            </div>
 
-                li.appendChild(cb);
-                li.appendChild(label);
-                ul.appendChild(li);
+
+            @* <div id="nPartWrap" style="display:none;">
+                <label>N_PART:</label>
+                <input type="text" id="nPart" placeholder="номер партии" />
+            </div>
+
+            <div id="nPlawWrap" style="display:none;">
+                <label>N_PLAW:</label>
+                <input type="text" id="nPlaw" placeholder="номер плавки" />
+            </div>
+ *@
+
+            <h3>Данные</h3>
+            <div id="content">
+                <div class="hint">Выберите таблицу слева.</div>
+            </div>
+        </main>
+    </div>
+
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+          document.addEventListener('click', function (e) {
+            const btn = e.target.closest('.selected-btn');
+            if (!btn) return;
+
+            const container = btn.closest('.selected-list') || btn.parentElement || document;
+
+
+            container.querySelectorAll('.selected-btn.active').forEach(b => {
+              if (b !== btn) {
+                b.classList.remove('active');
+                b.setAttribute('aria-pressed', 'false');
+              }
             });
 
-            groupsEl.appendChild(groupTitle);
-            groupsEl.appendChild(ul);
+            btn.classList.add('active');
+            btn.setAttribute('aria-pressed', 'true');
+            btn.setAttribute('role', 'button');
+          });
         });
-    }
+    </script>
 
-    /* -----------------------------------------------
-       Рендер кнопок выбранных таблиц слева
-    -------------------------------------------------*/
-    function renderSelectedButtons(names) {
-        selectedBtnGroup.innerHTML = "";
+    <script>
+        const dataBaseUrl   = '@Url.Page("./Index", "Data")';
+        const exportBaseUrl = '@Url.Page("./Index", "Export")';
+        const tablesStateUrl = '@Url.Page("./Index", "TablesState")';
+        const tables = [
+            "lnpp.ANGA_OTK","lnpp.AUO_OPXR","lnpp.BMC_1_2","lnpp.DATACENTR","lnpp.DATACENTR_OLD","lnpp.EXCEL3","lnpp.GEST","lnpp.JA_1","lnpp.JA_2","lnpp.JASH_1",
+        "lnpp.JASH_1_DUBL","lnpp.JASH_2","lnpp.JASH_2_DUBL","lnpp.LAB_LNPP","lnpp.LNGC_DATACENTR","lnpp.LNGC_OTK","lnpp.LNGC_OTK_DUBLE","lnpp.LPC3_MM",
+        "lnpp.MEX_CGCA","lnpp.MEX_CGCA_LOG","lnpp.MEX_LAB_OB","lnpp.MEX_LPC1","lnpp.MEX_LPC1_DUBLE","lnpp.MEX_LPC1_LOG","lnpp.MEX_LPC2","lnpp.MEX_LPC2_LOG",
+        "lnpp.MEX_LPC3","lnpp.MEX_LPC3_LOG","lnpp.MEX_LPC3_UCH","lnpp.MEX_LPC3_UCH_LOG","lnpp.MEX_SPC","lnpp.MEX_TRUBN","lnpp.MEX_TRUBN_LOG","lnpp.MICRO_CGCA",
+        "lnpp.MICRO_LPC1","lnpp.MICRO_LPC1_NEW","lnpp.MICRO_LPC2","lnpp.MICRO_LPC3","lnpp.NDC_DUBLE_LNPP","lnpp.NDC_LNPP","lnpp.OTGR_CGCA","lnpp.OTGR_CGCA_NEW",
+        "lnpp.OTGR_CGCA_OLD","lnpp.OTK","lnpp.PROD_LNPP","lnpp.PROD_LNPP_OLD","lnpp.PROIZ_LPC3","lnpp.PROIZV_ANGA","lnpp.PROIZV_ANGA_PRODUCTIV","lnpp.PROIZV_CGCA",
+        "lnpp.PROIZV_LKPP_OLD","lnpp.PROIZV_LNGC","lnpp.PROIZV_LNGC_PRODUCTIV","lnpp.PROIZV_LNPP","lnpp.PROIZV_LNPP_OLD","lnpp.PROIZV_LNPP_PROD_NEW",
+        "lnpp.PROIZV_LNPP_PRODUCTIV","lnpp.PROKAT_SMAZ","lnpp.PRPROKAT_CEXA","lnpp.RASTVOR_LNPP","lnpp.RASTVOR_OPXR2",
+        "lnpp.XIM_VODA","lnpp.XIMBXU_LPC2","lnpp.XIMKISLOTA_LPC2","lnpp.XIMMASLO_LPC2","lnpp.XIMMUL_LPC2","lnpp.XIMNTA_LPC2","lnpp.XIMVXKONTR_LPC3",
+        "lnpp.XIMXROM_LPC3"
+    ];
+        const groups = {
+          "ANGA": ["lnpp.ANGA_OTK"],
+              "AUO": ["lnpp.AUO_OPXR"],
+              "BMC": ["lnpp.BMC_1_2"],
+                  "DATACENTR": ["lnpp.DATACENTR","lnpp.DATACENTR_OLD"],
+          "EXCEL": ["lnpp.EXCEL3"],
+              "JA": ["lnpp.JA_1","lnpp.JA_2"],
+                          "JASH": ["lnpp.JASH_1","lnpp.JASH_1_DUBL","lnpp.JASH_2","lnpp.JASH_2_DUBL"],
+              "LAB_LNPP": ["lnpp.LAB_LNPP"],
+                      "LNGC": ["lnpp.LNGC_DATACENTR","lnpp.LNGC_OTK","lnpp.LNGC_OTK_DUBLE"],
+              "LPC3_MM": ["lnpp.LPC3_MM"],
+                                  "MEX": ["lnpp.MEX_CGCA","lnpp.MEX_CGCA_LOG","lnpp.MEX_LAB_OB","lnpp.MEX_LPC1","lnpp.MEX_LPC1_DUBLE","lnpp.MEX_LPC1_LOG",
+                                          "lnpp.MEX_LPC2","lnpp.MEX_LPC2_LOG","lnpp.MEX_LPC3","lnpp.MEX_LPC3_LOG","lnpp.MEX_LPC3_UCH","lnpp.MEX_LPC3_UCH_LOG",
+                              "lnpp.MEX_SPC","lnpp.MEX_TRUBN","lnpp.MEX_TRUBN_LOG"],
+                              "MICRO": ["lnpp.MICRO_CGCA","lnpp.MICRO_LPC1","lnpp.MICRO_LPC1_NEW","lnpp.MICRO_LPC2","lnpp.MICRO_LPC3"],
+                  "NDC": ["lnpp.NDC_DUBLE_LNPP","lnpp.NDC_LNPP"],
+                          "OTGR": ["lnpp.OTGR_CGCA","lnpp.OTGR_CGCA_NEW","lnpp.OTGR_CGCA_OLD","lnpp.VOZV_OTGR"],
+              "OTK": ["lnpp.OTK"],
+                  "PROD": ["lnpp.PROD_LNPP","lnpp.PROD_LNPP_OLD"],
+                              "PROIZ": ["lnpp.PROIZ_LPC3","lnpp.PROIZV_ANGA","lnpp.PROIZV_ANGA_PRODUCTIV","lnpp.PROIZV_CGCA","lnpp.PROIZV_LKPP_OLD",
+                                    "lnpp.PROIZV_LNGC","lnpp.PROIZV_LNGC_PRODUCTIV","lnpp.PROIZV_LNPP","lnpp.PROIZV_LNPP_OLD",
+                            "lnpp.PROIZV_LNPP_PROD_NEW","lnpp.PROIZV_LNPP_PRODUCTIV"],
+                  "PROKAT": ["lnpp.PROKAT_SMAZ","lnpp.PRPROKAT_CEXA"],
+                  "RASTVOR": ["lnpp.RASTVOR_LNPP","lnpp.RASTVOR_OPXR2"],
+                  "TEMP": ["lnpp.TEMP_NDC_020147","lnpp.TEMP_NDC_NNN"],
+                          "XIM": ["lnpp.XIM_VODA","lnpp.XIMBXU_LPC2","lnpp.XIMKISLOTA_LPC2","lnpp.XIMMASLO_LPC2",
+                                  "lnpp.XIMMUL_LPC2","lnpp.XIMNTA_LPC2","lnpp.XIMVXKONTR_LPC3","lnpp.XIMXROM_LPC3"]
+        };
 
-        for (let tbl of names) {
-            const btn = document.createElement("button");
-            btn.className = "table_btn";
-            btn.textContent = tbl;
-            selectedBtnGroup.appendChild(btn);
+
+
+
+        let currentTable = null;
+        const $id = (id) => document.getElementById(id);
+
+        const escapeHtml = (s) => String(s)
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+        const escapeAttr = (s) => escapeHtml(s);
+
+        const formatValue = (v) => (v == null ? '' : String(v));
+
+        function parseFilenameFromCD(cd){
+          if (!cd) return null;
+          const m = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+          if (!m) return null;
+          const raw = m[1] || m[2];
+          try { return decodeURIComponent(raw); } catch { return raw; }
         }
-    }
+        function formatNowForFile(){
+          const d = new Date();
+          return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${String(d.getFullYear()).slice(-2)}`;
+        }
 
-    /* -----------------------------------------------
-       Восстановление сохранённых таблиц
-    -------------------------------------------------*/
-    function restoreSelectedTables() {
-        const saved = loadSelectedTablesLocal();
-        if (saved.length === 0) return;
+        function groupTablesByLetter(arr){
+          const map = new Map();
+          for (const t of arr){
+            const first = t[0]?.toUpperCase() ?? '#';
+            const key = /[A-ZА-ЯЁ]/.test(first) ? first : '#';
+            if (!map.has(key)) map.set(key, []);
+            map.get(key).push(t);
+          }
+          return Array.from(map.entries()).sort((a,b)=>a[0].localeCompare(b[0],'ru'));
+        }
 
-        // Восстанавливаем чекбоксы
-        saved.forEach(t => {
-            const cb = document.querySelector(`input[data-table="${t}"]`);
-            if (cb) cb.checked = true;
-        });
 
-        // Рендерим кнопки
-        renderSelectedButtons(saved);
-    }
 
-    /* -----------------------------------------------
-       Обработчики кнопок: Применить / Сброс
-    -------------------------------------------------*/
-    function installHandlers() {
 
-        // Применить выбранные таблицы
-        if (applySelectionBtn) applySelectionBtn.addEventListener("click", () => {
+        window.__tableHasPart = new Set();
+        window.__tableHasPlaw = new Set();
 
-            const selected = Array.from(groupsEl.querySelectorAll("input[type='checkbox']:checked"))
-                .map(cb => cb.dataset.table);
+        async function getTablesMeta() {
+            try {
+                const res = await fetch(`${tablesStateUrl}`);
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                return await res.json(); 
+            } catch (err) {
+                console.warn('TablesState недоступен, рендерим группы без фильтра по наличию данных. Детали:', err);
+                return null; 
+            }
+        }
 
-            // Рендерим
-            renderSelectedButtons(selected);
 
-            // Сохраняем
-            saveSelectedTablesLocal(selected);
 
-            // Закрыть меню
-            if (menu) menu.classList.remove("open");
-        });
 
-        // Сброс выбора
-        if (resetSelectionBtn) resetSelectionBtn.addEventListener("click", () => {
-            Array.from(groupsEl.querySelectorAll("input[type='checkbox']")).forEach(cb => cb.checked = false);
+        async function renderGroups() {
+            const groupsEl = $id('tableGroups');
+            const meta = await getTablesMeta(); 
+            let hasDataSet = null;
+
+            if (meta && Array.isArray(meta)) {
+                hasDataSet = new Set(meta.filter(m => m.hasData).map(m => m.table));
+                window.__tableHasPart = new Set(meta.filter(m => m.hasPart).map(m => m.table));
+                window.__tableHasPlaw = new Set(meta.filter(m => m.hasPlaw).map(m => m.table));
+            }
+
+            groupsEl.innerHTML = Object.entries(groups).map(([groupName, items]) => {
+                const names = hasDataSet ? items.filter(name => hasDataSet.has(name)) : items;
+                if (names.length === 0) return ''; 
+
+                return `
+                <section class="group" data-name="${groupName}">
+                    <div class="group-header">
+                        <div class="group-title">${groupName}</div>
+                        <div class="group-actions">
+                            <button type="button" class="group-select" data-name="${groupName}">Все</button>
+                            <button type="button" class="group-clear"  data-name="${groupName}">Сброс</button>
+                        </div>
+                    </div>
+                    <div class="group-items">
+                        ${names.map(name => `
+                            <label class="group-item">
+                                <input type="checkbox" class="table-checkbox" data-table="${name}"/>
+                                <span>${name}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                </section>`;
+            }).join('');
+        }
+
+        function enableFilters(enabled){
+            const startDate = $id('startDate');
+            const endDate   = $id('endDate');
+            const applyBtn  = $id('applyFilterBtn');
+            const resetBtn  = $id('resetFilterBtn');
+            const info      = $id('filterInfo');
+
+            if (startDate) startDate.disabled = !enabled;
+            if (endDate)   endDate.disabled   = !enabled;
+            if (applyBtn)  applyBtn.disabled  = !enabled;
+            if (resetBtn)  resetBtn.disabled  = !enabled;
+            if (info) info.textContent = enabled ? `Выбрана таблица: ${currentTable}.` : 'Сначала выберите таблицу слева.';
+
+
+            // Показ/скрытие N_PART / N_PLAW при наличии таких столбцов (если используете эти поля)
+            syncExtraFilters(currentTable);
+        }
+
+        function syncExtraFilters(table){
+            const npWrap = $id('nPartWrap');
+            const nlWrap = $id('nPlawWrap');
+            const hasPart = !!(table && window.__tableHasPart?.has(table));
+            const hasPlaw = !!(table && window.__tableHasPlaw?.has(table));
+
+            if (npWrap) {
+                npWrap.style.display = hasPart ? '' : 'none';
+                if (!hasPart) { const np = $id('nPart'); if (np) np.value = ''; }
+            }
+            if (nlWrap) {
+                nlWrap.style.display = hasPlaw ? '' : 'none';
+                if (!hasPlaw) { const nl = $id('nPlaw'); if (nl) nl.value = ''; }
+            }
+        }
+
+        function collectFilterParams(){
+            const sd = ($id('startDate')?.value || '').trim();
+            const ed = ($id('endDate')?.value   || '').trim();
+            const np = ($id('nPart')?.value     || '').trim();
+            const nl = ($id('nPlaw')?.value     || '').trim();
+
+            const params = new URLSearchParams();
+            if (sd) params.set('startDate', sd);
+            if (ed) params.set('endDate', ed);
+            if (np) params.set('nPart',     np);
+            if (nl) params.set('nPlaw',     nl);
+            return params;
+        }
+
+
+        function renderSelectedButtons(names){
+            const box = $id('selectedTables');
+            if(!names || names.length===0){
+                box.innerHTML = '<div class="hint-p">Ничего не выбрано</div>';
+                currentTable = null;
+                enableFilters(false);
+                $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+                return;
+            }
+            names.sort((a,b)=>a.localeCompare(b,'ru'));
+            box.innerHTML = names.map(name=>`
+                <button class="selected-btn" data-table="${name}">
+                    ${name}
+                    <span class="selected-remove" data-remove="${name}">✕</span>
+                </button>
+            `).join('');
+
+            box.querySelectorAll('.selected-btn').forEach(btn=>{
+                btn.addEventListener('click', e=>{
+                    const rm = e.target.closest('[data-remove]');
+                    if(rm){
+                        const removed = rm.dataset.remove;
+                        const rest = names.filter(n => n !== removed);
+                        renderSelectedButtons(rest);
+                        const checkbox = document.querySelector(`input[data-table="${removed}"]`);
+                        if (checkbox) checkbox.checked = false;
+                        if (currentTable === removed) {
+                            currentTable = null;
+                            enableFilters(false);
+                            $id('content').innerHTML = '<div class="hint">Выберите таблицу слева.</div>';
+                            const s = document.getElementById('startDate');
+                            const e2 = document.getElementById('endDate');
+                            if (s) s.value = '';
+                            if (e2) e2.value = '';
+                        }
+                        return;
+                    }
+
+                    currentTable = btn.dataset.table;
+                    lastLoadedWithFilter = false;
+
+                    enableFilters(true);
+
+                    const s = document.getElementById('startDate');
+                    const e2 = document.getElementById('endDate');
+                    if (s) s.value = '';
+                    if (e2) e2.value = '';
+                    if (typeof currentOffset !== 'undefined') currentOffset = 0;
+
+                    loadTable(currentTable, true);
+                });
+            });
+        }
+
+        function installHandlers(){
+            const toggle   = $id('tablePickerToggle');
+            const menu     = $id('tablePickerMenu');
+            const search   = $id('tableSearch');
+            const groupsEl = $id('tableGroups');
+
+            if (toggle) {
+                toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
+                document.addEventListener('click', e=>{
+                    if(!menu.contains(e.target) && !toggle.contains(e.target)) menu.classList.remove('open');
+                });
+            }
+
+            if (search) {
+                search.addEventListener('input', ()=>{
+                    const q = search.value.toLowerCase();
+                    for(const item of groupsEl.querySelectorAll('.group-item')){
+                        item.style.display = item.textContent.toLowerCase().includes(q)?'':'none';
+                    }
+                });
+            }
+
+            groupsEl.addEventListener('click', e=>{
+                const btn = e.target.closest('button.group-select,button.group-clear');
+                if(!btn) return;
+                const groupName = btn.dataset.name; 
+                const section = groupsEl.querySelector(`.group[data-name="${groupName}"]`);
+                const check = btn.classList.contains('group-select');
+                for(const cb of section.querySelectorAll('input[type="checkbox"]')) cb.checked = check;
+            });
+
+            const selectAllBtn = $id('selectAllBtn');
+            const clearAllBtn  = $id('clearAllBtn');
+            if (selectAllBtn) selectAllBtn.addEventListener('click',()=>{
+                for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = true;
+            });
+            if (clearAllBtn) clearAllBtn.addEventListener('click',()=>{
+                for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]')) cb.checked = false;
+            });
+
+            const applySelectionBtn = $id('applySelectionBtn');
+            if (applySelectionBtn) applySelectionBtn.addEventListener('click',()=>{
+                const selected = Array.from(groupsEl.querySelectorAll('input[type="checkbox"]:checked')).map(cb => cb.dataset.table);
+                renderSelectedButtons(selected);
+                if (menu) menu.classList.remove('open');
+            });
+
+            const applyFilterBtn = $id('applyFilterBtn');
+            const resetFilterBtn = $id('resetFilterBtn');
+            if (applyFilterBtn) applyFilterBtn.addEventListener('click', ()=>{
+                if(!currentTable){
+                    showErrorModal('Сначала выберите таблицу слева.');
+                    return;
+                }
+                lastLoadedWithFilter = true;
+                loadTable(currentTable, false);
+            });
+            if (resetFilterBtn) resetFilterBtn.addEventListener('click', ()=>{
+                const sd = $id('startDate'); const ed = $id('endDate');
+                const np = $id('nPart');     const nl = $id('nPlaw');
+                if (sd) sd.value = '';
+                if (ed) ed.value = '';
+                if (np) np.value = '';
+                if (nl) nl.value = '';
+                enableFilters(!!currentTable);
+            });
+
+}
+
+        function setExportEnabled(enabled){
+            const btn = document.getElementById('exportBtn');
+            if (!btn) return;
+            btn.disabled = !enabled;
+        }
+
+        async function loadTable(table, initial) {
+          const content = $id('content');
+          content.innerHTML = `<div class="spinner">Загрузка данных из ${escapeHtml(table)}…</div>`;
+          setExportEnabled(false);
+
+          const inf = {
+            table,
+            offset: 0,
+            pageSize: 50,    
+            hasMore: true,
+            loading: false,
+            observer: null
+          };
+
+
+            function buildPagedUrl(baseUrl) {
+              const p = collectFilterParams();
+              p.set('table', inf.table);
+              p.set('offset', inf.offset);
+              p.set('pageSize', inf.pageSize);
+              return `${baseUrl}&${p.toString()}`;
+            }
+
+
+          async function loadChunk(baseUrl, tbodyEl, columnsRef) {
+            if (inf.loading || !inf.hasMore) return;
+            inf.loading = true;
+            try {
+              const res = await fetch(buildPagedUrl(baseUrl));
+              const payload = await res.json();
+
+              const rows = Array.isArray(payload) ? payload : (Array.isArray(payload.data) ? payload.data : []);
+              if (!rows || rows.length === 0) {
+                inf.hasMore = false;
+                return;
+              }
+
+              const columns = columnsRef.current ?? Object.keys(rows[0]);
+              columnsRef.current = columns;
+
+              const frag = document.createDocumentFragment();
+              for (const row of rows) {
+                const tr = document.createElement('tr');
+                for (const c of columns) {
+                  const td = document.createElement('td');
+                  td.textContent = formatValue(row[c] ?? '');
+                  tr.appendChild(td);
+                }
+                frag.appendChild(tr);
+              }
+              tbodyEl.appendChild(frag);
+
+              inf.offset = Array.isArray(payload)
+                ? inf.offset + rows.length
+                : (Number.isFinite(payload.nextOffset) ? payload.nextOffset : inf.offset + rows.length);
+
+              inf.hasMore = Array.isArray(payload)
+                ? (rows.length === inf.pageSize)
+                : !!payload.hasMore;
+            } catch (e) {
+              console.error('[infinite] load error:', e);
+              inf.hasMore = false;
+            } finally {
+              inf.loading = false;
+            }
+          }
+
+          function attachObserverToLastRow(baseUrl, tbodyEl, columnsRef) {
+            if (inf.observer) {
+              try { inf.observer.disconnect(); } catch {}
+            }
+            const io = new IntersectionObserver(entries => {
+              if (entries.some(e => e.isIntersecting)) {
+                loadChunk(baseUrl, tbodyEl, columnsRef).then(() => {
+                  const last = tbodyEl.lastElementChild;
+                  if (last) {
+                    for (const entry of entries) io.unobserve(entry.target);
+                    io.observe(last);
+                  } else {
+                    io.disconnect();
+                  }
+                });
+              }
+            }, { root: null, rootMargin: '200px', threshold: 0 });
+            const lastRow = tbodyEl.lastElementChild;
+            if (lastRow) io.observe(lastRow);
+            inf.observer = io;
+          }
+
+          try {
+            const base = `${dataBaseUrl}&table=${encodeURIComponent(table)}`;
+            const params = collectFilterParams();
+            const url = initial ? base : `${base}&${params.toString()}`;
+
+            const res = await fetch(url);
+            const data = await res.json();
+
+            const sd = ($id('startDate')?.value || '').trim().replace(/-/g, '.');
+            const ed = ($id('endDate')?.value   || '').trim().replace(/-/g, '.');
+            const np = ($id('nPart')?.value     || '').trim();
+            const nl = ($id('nPlaw')?.value     || '').trim();
+
+            // const hasAnyFilter = (!initial) && (sd || ed || np || nl);
+            // const filterBadge = hasAnyFilter
+            //   ? `<span class="hint">Фильтр: ${sd || 'Не указана дата от'} - ${ed || 'Не указана дата до'}${(np||nl)?`, N_PART=${np||'Не указано'}, N_PLAW=${nl||'Не указано'}`:''}</span>`
+            //   : `<span class="hint">Без фильтра</span>`;
+
+            const rows = Array.isArray(data) ? data : (Array.isArray(data.data) ? data.data : []);
+            if (!Array.isArray(rows) || rows.length === 0) {
+              content.innerHTML = `
+                
+                <div class="toolbar">
+                  <button id="exportBtn" class="btn" disabled onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+                </div>
+                <p class="hint">Нет данных.</p>`;
+              return; //esli nado to vernyt posle innerhtml <h3>${escapeHtml(table)} ${filterBadge}</h3>
+            }
+
+            const columns = Object.keys(rows[0]);
+            const thead = `<thead id="thead-main"><tr>${columns.map(c => `<th>${escapeHtml(c)}</th>`).join('')}</tr></thead>`;
+            const tbody = `<tbody id="tbody-main">${rows.map(row => `<tr>${columns.map(c => `<td>${escapeHtml(formatValue(row[c]))}</td>`).join('')}</tr>`).join('')}</tbody>`;
+
+            content.innerHTML = `
+              
+              <div class="toolbar">
+                <button id="exportBtn" class="btn" onclick="exportExcel('${escapeAttr(table)}')">Экспорт в Excel</button>
+              </div>
+              <div class="table-wrap"><table>${thead}${tbody}</table></div>
+                    `; //esli nado to vernyt posle innerhtml<h3>${escapeHtml(table)} ${filterBadge}</h3>
+            setExportEnabled(true);
+
+            inf.offset = Array.isArray(data)
+              ? rows.length
+              : (Number.isFinite(data.nextOffset) ? data.nextOffset : rows.length);
+            inf.hasMore = Array.isArray(data)
+              ? (rows.length === inf.pageSize)
+              : (data.hasMore ?? rows.length === inf.pageSize);
+
+            const tbodyEl = document.getElementById('tbody-main');
+
+            const columnsRef = { current: columns };
+
+            attachObserverToLastRow(base, tbodyEl, columnsRef);
+
+          } catch (err) {
+            showErrorModal('Ошибка загрузки данных: ' + err.message);
+            content.innerHTML = `<div class="error">Ошибка: ${escapeHtml(err.message)}</div>`;
+            setExportEnabled(false);
+          }
+        }
+
+        const exportModal = document.createElement("div");
+        exportModal.className = "export-modal";
+        exportModal.innerHTML = `
+            <div class="export-modal-box">
+                <div class="export-text">Пожалуйста, подождите…</div>
+            </div>
+        `;
+        document.body.appendChild(exportModal);
+
+        function showExportModal(){ exportModal.classList.add("open"); }
+        function hideExportModal(){ exportModal.classList.remove("open"); }
+
+        const errorModal = document.createElement("div");
+        errorModal.className = "error-modal";
+        errorModal.innerHTML = `
+            <div class="error-modal-box">
+                <div id="error-text" class="error-text">Ошибка!</div>
+                <button id="error-close" class="error-close">Закрыть</button>
+            </div>
+        `;
+        document.body.appendChild(errorModal);
+
+        function showErrorModal(message) {
+            const t = document.getElementById('error-text');
+            if (t) t.textContent = message;
+            errorModal.classList.add("open");
+        }
+        document.getElementById('error-close').onclick = function() {
+            errorModal.classList.remove("open");
+        };
+        window.onclick = function(event) {
+            if (event.target === errorModal) {
+                errorModal.classList.remove("open");
+            }
+        };
+
+
+        window.exportExcel = async function(table) {
+          showExportModal();
+          try {
+            const p = collectFilterParams();
+            if (table) p.set('table', table);
+
+            const sep = exportBaseUrl.includes('?') ? '&' : '?';
+            const url = `${exportBaseUrl}${sep}${p.toString()}`;
+
+            const resp = await fetch(url, { method: 'GET' });
+
+            if (!resp.ok) {
+              let msg = `HTTP ${resp.status} ${resp.statusText}`;
+              try {
+                const text = await resp.text();
+                if (text) msg += `\n\n${text}`;
+              } catch {}
+              throw new Error(msg);
+            }
+
+            const cd = resp.headers.get('Content-Disposition') || '';
+            const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+            const raw = m ? (m[1] || m[2]) : null;
+            const name = raw
+              ? decodeURIComponent(raw)
+              : `${(table || 'export').replace(/[^\w.-]+/g,'_')}_${formatNowForFile()}.xlsx`;
+
+            const blob = await resp.blob();
+
+            const buf = await blob.arrayBuffer();
+            const u8 = new Uint8Array(buf);
+            const isZip = u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4B && u8[2] === 0x03 && u8[3] === 0x04;
+
+            if (!isZip) {
+              let preview = '';
+              try {
+                const text = new TextDecoder('utf-8').decode(u8.subarray(0, Math.min(4000, u8.length)));
+                preview = text;
+              } catch {}
+              throw new Error(
+                'Сервер вернул не XLSX. Проверьте логи.\n' +
+                'Content-Type: ' + (resp.headers.get('Content-Type') || 'unknown') + '\n\n' +
+                (preview ? preview : '(пустой/нечитаемый ответ)')
+              );
+            }
+
+            const okBlob = new Blob([buf], {
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            });
+
+            const blobUrl = URL.createObjectURL(okBlob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(blobUrl);
+          } catch (err) {
+            console.error(err);
+            showErrorModal('Ошибка экспорта: ' + (err?.message || err));
+          } finally {
+            hideExportModal();
+          }
+        };
+
+
+       
+
+
+        function formatNowForFile(){
+            const d = new Date();
+            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
+        }
+
+        (async function init(){
+            await renderGroups();    
+            installHandlers();        
+            enableFilters(false);     
             renderSelectedButtons([]);
-            saveSelectedTablesLocal([]);
-        });
+            window.exportExcel = exportExcel; 
+        })();
+    </script>
 
-        // Кнопка меню (бургер)
-        const menuBtn = document.getElementById("menu_btn");
-        if (menuBtn) {
-            menuBtn.addEventListener("click", () => {
-                menu.classList.toggle("open");
-            });
-        }
-    }
-
-    /* -----------------------------------------------
-       Поиск по таблицам (живой поиск)
-    -------------------------------------------------*/
-    function installSearchFilter() {
-        if (!manualSearchInput) return;
-
-        manualSearchInput.addEventListener("input", () => {
-            const value = manualSearchInput.value.trim().toLowerCase();
-
-            document.querySelectorAll("#groups ul li").forEach(li => {
-                const name = li.querySelector("label").textContent.toLowerCase();
-                li.style.display = name.includes(value) ? "" : "none";
-            });
-        });
-    }
-
-    /* -----------------------------------------------
-          Инициализация
-    -------------------------------------------------*/
-
-    renderGroups();
-    installHandlers();
-    installSearchFilter();
-    restoreSelectedTables();
-
-});
+</body>
+</html>
