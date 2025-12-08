@@ -1,19 +1,152 @@
-// --- Сохранение состояния выбранных таблиц ---
+<script>
+/* -----------------------------------------------------------
+   ВЫБОР ТАБЛИЦ — СОХРАНЕНИЕ И ВОССТАНОВЛЕНИЕ
+----------------------------------------------------------- */
+
+// ===== LOCALSTORAGE API =====
+
 function saveSelectedTables(names) {
     try {
         localStorage.setItem("selectedTables", JSON.stringify(names));
-    } catch (e) {
-        console.warn("Не удалось сохранить выбранные таблицы:", e);
-    }
+    } catch (e) { console.warn("Не удалось сохранить список:", e); }
 }
 
-// --- Загрузка состояния выбранных таблиц ---
 function loadSelectedTables() {
     try {
         const raw = localStorage.getItem("selectedTables");
         if (!raw) return [];
         return JSON.parse(raw);
-    } catch {
-        return [];
-    }
+    } catch { return []; }
 }
+
+// ===== ВСПОМОГАТЕЛЬНЫЕ =====
+
+const $ = id => document.getElementById(id);
+
+function getCheckedTables() {
+    return Array.from(document.querySelectorAll('.table-checkbox:checked'))
+        .map(cb => cb.dataset.table);
+}
+
+// ===== РЕНДЕР selected-btn =====
+
+function renderSelectedButtons(names) {
+    const box = $('selectedTables');
+
+    if (!names || names.length === 0) {
+        box.innerHTML = `<div class="hint-p">Ничего не выбрано</div>`;
+        return;
+    }
+
+    names.sort((a, b) => a.localeCompare(b, "ru"));
+    box.innerHTML = names.map(name => `
+        <button class="selected-btn" data-table="${name}">
+            ${name}
+            <span class="selected-remove" data-remove="${name}">✕</span>
+        </button>
+    `).join('');
+
+    // === КЛИК ПО selected-btn ===
+    box.querySelectorAll(".selected-btn").forEach(btn => {
+        btn.onclick = e => {
+            const remove = e.target.closest(".selected-remove");
+            const table = btn.dataset.table;
+
+            // --- Если нажата кнопка "Удалить" ---
+            if (remove) {
+                const rest = names.filter(n => n !== table);
+
+                // снять галочку
+                const cb = document.querySelector(`input[data-table="${table}"]`);
+                if (cb) cb.checked = false;
+
+                saveSelectedTables(rest);
+                renderSelectedButtons(rest);
+                return;
+            }
+
+            // --- Клик по кнопке выбора таблицы ---
+            currentTable = table;
+            loadTable(table, true); // загрузка данных твоей функцией
+        };
+    });
+
+    saveSelectedTables(names);
+}
+
+// ===== РЕНДЕР ГРУПП ТАБЛИЦ + ВОССТАНОВЛЕНИЕ ЧЕКБОКСОВ =====
+
+async function renderGroups() {
+    const container = $("tableGroups");
+
+    container.innerHTML = Object.entries(groups).map(([name, list]) => `
+        <section class="group" data-name="${name}">
+            <div class="group-header">
+                <div class="group-title">${name}</div>
+                <div class="group-actions">
+                    <button class="group-select" data-name="${name}">Все</button>
+                    <button class="group-clear"  data-name="${name}">Сброс</button>
+                </div>
+            </div>
+            <div class="group-items">
+                ${list.map(t => `
+                    <label class="group-item">
+                        <input type="checkbox" class="table-checkbox" data-table="${t}" />
+                        <span>${t}</span>
+                    </label>
+                `).join("")}
+            </div>
+        </section>
+    `).join("");
+
+    // === ВОССТАНОВЛЕНИЕ СОСТОЯНИЯ ЧЕКБОКСОВ ===
+    const saved = loadSelectedTables();
+
+    for (const cb of document.querySelectorAll('.table-checkbox')) {
+        if (saved.includes(cb.dataset.table))
+            cb.checked = true;
+
+        cb.onchange = () => {
+            const newList = getCheckedTables();
+            saveSelectedTables(newList);
+            renderSelectedButtons(newList);
+        };
+    }
+
+    // === Кнопка "ВСЕ" / "СБРОС" ===
+    container.onclick = e => {
+        if (e.target.classList.contains("group-select")) {
+            const group = e.target.dataset.name;
+            document.querySelectorAll(`.group[data-name="${group}"] .table-checkbox`)
+                .forEach(cb => cb.checked = true);
+        }
+
+        if (e.target.classList.contains("group-clear")) {
+            const group = e.target.dataset.name;
+            document.querySelectorAll(`.group[data-name="${group}"] .table-checkbox`)
+                .forEach(cb => cb.checked = false);
+        }
+
+        const updated = getCheckedTables();
+        saveSelectedTables(updated);
+        renderSelectedButtons(updated);
+    };
+}
+
+/* -----------------------------------------------------------
+   ТВОИ ФУНКЦИИ: loadTable(), exportExcel(), фильтры, API...
+   Я их не меняю — они продолжают работать как есть.
+----------------------------------------------------------- */
+
+let currentTable = null;
+
+/* -----------------------------------------------------------
+   ИНИЦИАЛИЗАЦИЯ
+----------------------------------------------------------- */
+
+(async function init() {
+    await renderGroups();            // рендер групп + восстановление чекбоксов
+    const saved = loadSelectedTables();
+    renderSelectedButtons(saved);    // восстановление "выбранных таблиц"
+})();
+</script>
