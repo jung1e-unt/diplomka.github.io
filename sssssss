@@ -1,125 +1,72 @@
-function installHandlers() {
-    const toggle   = $id('tablePickerToggle');
-    const menu     = $id('tablePickerMenu');
-    const search   = $id('tableSearch');
-    const groupsEl = $id('tableGroups');
+// ==========================
+//  С О Х Р А Н Е Н И Е  С О С Т О Я Н И Я
+// ==========================
 
-    // -----------------------------
-    // Открытие / закрытие меню
-    // -----------------------------
-    if (toggle) {
-        toggle.addEventListener('click', ()=>menu.classList.toggle('open'));
-        document.addEventListener('click', e=>{
-            if(!menu.contains(e.target) && !toggle.contains(e.target))
-                menu.classList.remove('open');
-        });
-    }
+// Ключ для хранения
+const LS_KEY = "uiState";
 
-    // -----------------------------
-    // Поиск по таблицам
-    // -----------------------------
-    if (search) {
-        search.addEventListener('input', ()=>{
-            const q = search.value.toLowerCase();
-            for(const item of groupsEl.querySelectorAll('.group-item')){
-                item.style.display = item.textContent.toLowerCase().includes(q) ? '' : 'none';
-            }
-        });
-    }
+function saveState() {
+    const selected = Array.from(
+        document.querySelectorAll('#tableGroups input[type="checkbox"]:checked')
+    ).map(cb => cb.dataset.table);
 
-    // -----------------------------
-    // Выделить группу / снять выделение
-    // -----------------------------
-    groupsEl.addEventListener('click', e=>{
-        const btn = e.target.closest('button.group-select,button.group-clear');
-        if(!btn) return;
-
-        const groupName = btn.dataset.name; 
-        const section = groupsEl.querySelector(`.group[data-name="${groupName}"]`);
-        const check = btn.classList.contains('group-select');
-
-        for(const cb of section.querySelectorAll('input[type="checkbox"]'))
-            cb.checked = check;
-    });
-
-    // -----------------------------
-    // Выделить всё / очистить всё
-    // -----------------------------
-    const selectAllBtn = $id('selectAllBtn');
-    const clearAllBtn  = $id('clearAllBtn');
-
-    if (selectAllBtn) selectAllBtn.addEventListener('click',()=>{
-        for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]'))
-            cb.checked = true;
-    });
-
-    if (clearAllBtn) clearAllBtn.addEventListener('click',()=>{
-        for(const cb of groupsEl.querySelectorAll('input[type="checkbox"]'))
-            cb.checked = false;
-    });
-
-    // -----------------------------
-    // Применить выбранные таблицы
-    // -----------------------------
-    const applySelectionBtn = $id('applySelectionBtn');
-
-    if (applySelectionBtn) applySelectionBtn.addEventListener('click',()=>{
-        const selected = Array.from(
-            groupsEl.querySelectorAll('input[type="checkbox"]:checked')
-        ).map(cb => cb.dataset.table);
-
-        // вызываем рендер + сохранение в localStorage
-        renderSelectedButtons(selected);
-
-        if (menu) menu.classList.remove('open');
-    });
-
-    // -----------------------------
-    // Применить фильтры
-    // -----------------------------
-    const applyFilterBtn = $id('applyFilterBtn');
-    const resetFilterBtn = $id('resetFilterBtn');
-
-    if (applyFilterBtn) applyFilterBtn.addEventListener('click', ()=>{
-        if(!currentTable){
-            showErrorModal('Сначала выберите таблицу слева.');
-            return;
+    const state = {
+        selectedTables: selected,
+        currentTable: currentTable,
+        filters: {
+            startDate: $id('startDate')?.value || "",
+            endDate:   $id('endDate')?.value || "",
+            nPart:     $id('nPart')?.value || "",
+            nPlaw:     $id('nPlaw')?.value || ""
         }
-        lastLoadedWithFilter = true;
-        loadTable(currentTable, false);
-    });
+    };
 
-    // -----------------------------
-    // Сброс фильтров
-    // -----------------------------
-    if (resetFilterBtn) resetFilterBtn.addEventListener('click', ()=>{
-        const sd = $id('startDate');
-        const ed = $id('endDate');
-        const np = $id('nPart');
-        const nl = $id('nPlaw');
+    localStorage.setItem(LS_KEY, JSON.stringify(state));
+}
 
-        if (sd) sd.value = '';
-        if (ed) ed.value = '';
-        if (np) np.value = '';
-        if (nl) nl.value = '';
+// Каждое действие пользователя сохраняет состояние
+document.addEventListener("change", saveState);
+document.addEventListener("click", saveState);
 
-        enableFilters(!!currentTable);
-    });
+// ==========================
+//  В О С С Т А Н О В Л Е Н И Е
+// ==========================
 
-    // ============================================================
-    // ВОССТАНОВЛЕНИЕ ИЗ LOCALSTORAGE ПРИ ЗАГРУЗКЕ
-    // ============================================================
-    const saved = JSON.parse(localStorage.getItem('selectedTables') || '[]');
+function restoreState() {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return;
 
-    if (saved.length > 0) {
+    const state = JSON.parse(raw);
 
-        // восстановить галочки в списке
-        saved.forEach(name => {
-            const cb = document.querySelector(`input[data-table="${name}"]`);
-            if (cb) cb.checked = true;
-        });
+    // восстановить чекбоксы
+    if (state.selectedTables) {
+        for (const cb of document.querySelectorAll('#tableGroups input[type="checkbox"]')) {
+            cb.checked = state.selectedTables.includes(cb.dataset.table);
+        }
+    }
 
-        // восстановить кнопки выбранных таблиц
-        renderSelectedButtons(saved);
+    // восстановить выбранные кнопки слева
+    renderSelectedButtons(state.selectedTables || []);
+
+    // восстановить фильтры
+    if (state.filters) {
+        if ($id('startDate')) $id('startDate').value = state.filters.startDate;
+        if ($id('endDate'))   $id('endDate').value   = state.filters.endDate;
+        if ($id('nPart'))     $id('nPart').value     = state.filters.nPart;
+        if ($id('nPlaw'))     $id('nPlaw').value     = state.filters.nPlaw;
+    }
+
+    // восстановить текущую таблицу
+    if (state.currentTable) {
+        currentTable = state.currentTable;
+        enableFilters(true);
+
+        // загрузить данные таблицы сразу
+        loadTable(currentTable, true);
     }
 }
+
+// запускаем восстановление после полной загрузки
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(restoreState, 50); // даём таблицам отрендериться
+});
