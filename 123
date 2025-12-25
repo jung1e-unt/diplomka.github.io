@@ -1,3 +1,5 @@
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
 <script>
 window.exportExcel = async function(table) {
   showExportModal();
@@ -15,77 +17,79 @@ window.exportExcel = async function(table) {
     const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
     const raw = m ? (m[1] || m[2]) : null;
 
-    const name = raw
+    const fileName = raw
       ? decodeURIComponent(raw)
       : `${(table || 'export')}_${formatNowForFile()}.xlsx`;
 
-    const arrayBuffer = await resp.arrayBuffer();
+    const buf = await resp.arrayBuffer();
 
-    // ===== РАЗБОР XLSX =====
-    const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
+    // ===== читаем XLSX =====
+    const wb = XLSX.read(buf, {
+      type: 'array',
+      cellDates: true
+    });
 
     const minExcelDate = new Date(1900, 0, 1);
 
     wb.SheetNames.forEach(sheetName => {
       const ws = wb.Sheets[sheetName];
 
-      Object.keys(ws).forEach(cellAddr => {
-        if (cellAddr[0] === '!') return;
+      Object.keys(ws).forEach(addr => {
+        if (addr.startsWith('!')) return;
 
-        const cell = ws[cellAddr];
+        const c = ws[addr];
 
-        // Если это дата
-        if (cell.t === 'd' && cell.v instanceof Date) {
-          if (cell.v < minExcelDate) {
-            // ❗ Превращаем в ТЕКСТ
-            cell.t = 's';
-            cell.v = formatDateTime(cell.v);
-            delete cell.z;
+        // ЯЧЕЙКА-ДАТА
+        if (c.t === 'd' && c.v instanceof Date) {
+          if (c.v < minExcelDate) {
+            c.t = 's'; // превращаем в ТЕКСТ
+            c.v = formatDateTime(c.v);
+            delete c.z;
           }
         }
 
-        // Иногда дата приходит как число
-        if (cell.t === 'n' && cell.z && /[dy]/i.test(cell.z)) {
-          const d = XLSX.SSF.parse_date_code(cell.v);
+        // ЧИСЛОВАЯ ДАТА
+        if (c.t === 'n' && c.z) {
+          const d = XLSX.SSF.parse_date_code(c.v);
           if (d) {
             const jsDate = new Date(d.y, d.m - 1, d.d, d.H, d.M, d.S);
             if (jsDate < minExcelDate) {
-              cell.t = 's';
-              cell.v = formatDateTime(jsDate);
-              delete cell.z;
+              c.t = 's';
+              c.v = formatDateTime(jsDate);
+              delete c.z;
             }
           }
         }
       });
     });
 
-    // ===== ПЕРЕСБОРКА XLSX =====
-    const newWbArray = XLSX.write(wb, {
+    // ===== записываем НОВЫЙ XLSX =====
+    const out = XLSX.write(wb, {
       bookType: 'xlsx',
       type: 'array'
     });
 
-    const blob = new Blob([newWbArray], {
+    const blob = new Blob([out], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     });
 
-    downloadBlob(blob, name);
+    download(blob, fileName);
 
-  } catch (err) {
-    console.error(err);
-    showErrorModal('Ошибка экспорта: ' + err.message);
+  } catch (e) {
+    console.error(e);
+    showErrorModal('Ошибка экспорта: ' + e.message);
   } finally {
     hideExportModal();
   }
 };
 
-// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+// ===== helpers =====
 
-function downloadBlob(blob, filename) {
+function download(blob, name) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = filename;
+  a.download = name;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -93,22 +97,13 @@ function downloadBlob(blob, filename) {
 }
 
 function formatDateTime(d) {
-  const pad = n => n.toString().padStart(2, '0');
-  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ` +
-         `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const p = n => n.toString().padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function formatNowForFile() {
   const d = new Date();
-  const pad = n => n.toString().padStart(2,'0');
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_` +
-         `${pad(d.getHours())}-${pad(d.getMinutes())}`;
+  const p = n => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
 }
-
-(async function init(){
-  await renderGroups();
-  installHandlers();
-  enableFilters(false);
-  restoreState();
-})();
 </script>
