@@ -1,79 +1,114 @@
-        window.exportExcel = async function(table) {
-          showExportModal();
-          try {
-            const p = collectFilterParams();
-            if (table) p.set('table', table);
+<script>
+window.exportExcel = async function(table) {
+  showExportModal();
+  try {
+    const p = collectFilterParams();
+    if (table) p.set('table', table);
 
-            const sep = exportBaseUrl.includes('?') ? '&' : '?';
-            const url = `${exportBaseUrl}${sep}${p.toString()}`;
+    const sep = exportBaseUrl.includes('?') ? '&' : '?';
+    const url = `${exportBaseUrl}${sep}${p.toString()}`;
 
-            const resp = await fetch(url, { method: 'GET' });
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
 
-            if (!resp.ok) {
-              let msg = `HTTP ${resp.status} ${resp.statusText}`;
-              try {
-                const text = await resp.text();
-                if (text) msg += `\n\n${text}`;
-              } catch {}
-              throw new Error(msg);
-            }
+    const cd = resp.headers.get('Content-Disposition') || '';
+    const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
+    const raw = m ? (m[1] || m[2]) : null;
 
-            const cd = resp.headers.get('Content-Disposition') || '';
-            const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-            const raw = m ? (m[1] || m[2]) : null;
-            const name = raw
-              ? decodeURIComponent(raw)
-              : `${(table || 'export').replace(/[^\w.-]+/g,'_')}_${formatNowForFile()}.xlsx`;
+    const name = raw
+      ? decodeURIComponent(raw)
+      : `${(table || 'export')}_${formatNowForFile()}.xlsx`;
 
-            const blob = await resp.blob();
+    const arrayBuffer = await resp.arrayBuffer();
 
-            const buf = await blob.arrayBuffer();
-            const u8 = new Uint8Array(buf);
-            const isZip = u8.length >= 4 && u8[0] === 0x50 && u8[1] === 0x4B && u8[2] === 0x03 && u8[3] === 0x04;
+    // ===== РАЗБОР XLSX =====
+    const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
 
-            if (!isZip) {
-              let preview = '';
-              try {
-                const text = new TextDecoder('utf-8').decode(u8.subarray(0, Math.min(4000, u8.length)));
-                preview = text;
-              } catch {}
-              throw new Error(
-                'Сервер вернул не XLSX. Проверьте логи.\n' +
-                'Content-Type: ' + (resp.headers.get('Content-Type') || 'unknown') + '\n\n' +
-                (preview ? preview : '(пустой/нечитаемый ответ)')
-              );
-            }
+    const minExcelDate = new Date(1900, 0, 1);
 
-            const okBlob = new Blob([buf], {
-              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-            });
+    wb.SheetNames.forEach(sheetName => {
+      const ws = wb.Sheets[sheetName];
 
-            const blobUrl = URL.createObjectURL(okBlob);
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = name;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            URL.revokeObjectURL(blobUrl);
-          } catch (err) {
-            console.error(err);
-            showErrorModal('Ошибка экспорта: ' + (err?.message || err));
-          } finally {
-            hideExportModal();
+      Object.keys(ws).forEach(cellAddr => {
+        if (cellAddr[0] === '!') return;
+
+        const cell = ws[cellAddr];
+
+        // Если это дата
+        if (cell.t === 'd' && cell.v instanceof Date) {
+          if (cell.v < minExcelDate) {
+            // ❗ Превращаем в ТЕКСТ
+            cell.t = 's';
+            cell.v = formatDateTime(cell.v);
+            delete cell.z;
           }
-        };
-
-
-        function formatNowForFile(){
-            const d = new Date();
-            return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
         }
 
-        (async function init(){
-            await renderGroups();    
-            installHandlers();        
-            enableFilters(false);     
-            restoreState();
-            window.exportExcel = exportExcel;
-        })();
+        // Иногда дата приходит как число
+        if (cell.t === 'n' && cell.z && /[dy]/i.test(cell.z)) {
+          const d = XLSX.SSF.parse_date_code(cell.v);
+          if (d) {
+            const jsDate = new Date(d.y, d.m - 1, d.d, d.H, d.M, d.S);
+            if (jsDate < minExcelDate) {
+              cell.t = 's';
+              cell.v = formatDateTime(jsDate);
+              delete cell.z;
+            }
+          }
+        }
+      });
+    });
+
+    // ===== ПЕРЕСБОРКА XLSX =====
+    const newWbArray = XLSX.write(wb, {
+      bookType: 'xlsx',
+      type: 'array'
+    });
+
+    const blob = new Blob([newWbArray], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+
+    downloadBlob(blob, name);
+
+  } catch (err) {
+    console.error(err);
+    showErrorModal('Ошибка экспорта: ' + err.message);
+  } finally {
+    hideExportModal();
+  }
+};
+
+// ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function formatDateTime(d) {
+  const pad = n => n.toString().padStart(2, '0');
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()} ` +
+         `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function formatNowForFile() {
+  const d = new Date();
+  const pad = n => n.toString().padStart(2,'0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_` +
+         `${pad(d.getHours())}-${pad(d.getMinutes())}`;
+}
+
+(async function init(){
+  await renderGroups();
+  installHandlers();
+  enableFilters(false);
+  restoreState();
+})();
+</script>
