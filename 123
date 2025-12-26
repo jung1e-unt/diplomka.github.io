@@ -1,58 +1,33 @@
-private static void ApplyDateColumnFormats2(IXLWorksheet ws, DataTable dt)
-{
-    var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    private static DataTable ToDataTable(OracleDataReader reader)
     {
-        "TIMES_NACH", "TIMES_KON", "T1", "VREMYA"
-    };
+        var dt = new DataTable();
+        var schema = reader.GetColumnSchema();
 
-    for (int i = 0; i < dt.Columns.Count; i++)
-    {
-        var col = dt.Columns[i];
-
-        if (col.DataType != typeof(DateTime))
-            continue;
-
-        if (!timeColumns.Contains(col.ColumnName))
-            continue;
-
-        var xlCol = ws.Column(i + 1);
-
-        foreach (var cell in xlCol.CellsUsed().Skip(1)) // без заголовка
+        foreach (var col in schema)
         {
-            if (cell.TryGetValue<DateTime>(out var dtVal))
+            var type = col.DataType ?? typeof(string);
+            if (type == typeof(object) && !string.IsNullOrEmpty(col.DataTypeName))
             {
-                // КЛЮЧЕВО: DateTime → TimeSpan
-                cell.Value = dtVal.TimeOfDay;
+                var name = col.DataTypeName.ToUpperInvariant();
+                if (name.Contains("DATE") || name.Contains("TIMESTAMP"))
+                    type = typeof(DateTime);
+                else if (name.Contains("NUMBER"))
+                    type = typeof(decimal);
+                else if (name.Contains("FLOAT") || name.Contains("BINARY_FLOAT") || name.Contains("BINARY_DOUBLE"))
+                    type = typeof(double);
             }
+
+            dt.Columns.Add(col.ColumnName, type);
         }
 
-        xlCol.Style.NumberFormat.Format = "hh:mm";
-    }
-}
-
-private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt)
-{
-    var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "created_date", "updated_date", "deleted_date",
-        "create_date", "sample_datetime", "date_create"
-    };
-
-    for (int i = 0; i < dt.Columns.Count; i++)
-    {
-        var col = dt.Columns[i];
-
-        if (col.DataType != typeof(DateTime))
-            continue;
-
-        if (timeColumns.Contains(col.ColumnName))
+        while (reader.Read())
         {
-            ws.Column(i + 1).Style.NumberFormat.Format = "dd.MM.yyyy HH:mm:ss";
-        }
-        else
-        {
-            ws.Column(i + 1).Style.NumberFormat.Format = "dd.MM.yyyy";
-        }
-    }
-}
+            var row = dt.NewRow();
+            for (int i = 0; i < dt.Columns.Count; i++)
+                row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
 
+            dt.Rows.Add(row);
+        }
+
+        return dt;
+    }
