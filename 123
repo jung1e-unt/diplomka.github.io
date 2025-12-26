@@ -1,134 +1,68 @@
-<script>
-/* =========================
-   ВСПОМОГАТЕЛЬНЫЕ МОДАЛКИ
-   (если у тебя уже есть — можешь удалить)
-========================= */
+window.exportExcel = function (tableId) {
+    try {
+        showExportModal();
 
-function showExportModal() {
-  console.log('Экспорт...');
-}
-
-function hideExportModal() {
-  console.log('Экспорт завершён');
-}
-
-function showErrorModal(msg) {
-  alert(msg);
-}
-
-/* =========================
-   ФОРМАТ ИМЕНИ ФАЙЛА
-========================= */
-
-function formatNowForFile(){
-  const d = new Date();
-  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_` +
-         `${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
-}
-
-/* =========================
-   ОСНОВНОЙ ЭКСПОРТ EXCEL
-========================= */
-
-window.exportExcel = function(tableSelector, filePrefix = 'export') {
-  showExportModal();
-
-  try {
-    const table = document.querySelector(tableSelector);
-    if (!table) {
-      throw new Error('HTML-таблица не найдена');
-    }
-
-    // Создание книги и листа
-    const wb = XLSX.utils.book_new();
-    const ws = XLSX.utils.table_to_sheet(table, {
-      raw: true
-    });
-
-    const range = XLSX.utils.decode_range(ws['!ref']);
-
-    // ====== Приведение типов ======
-    for (let R = range.s.r + 1; R <= range.e.r; R++) {
-      for (let C = range.s.c; C <= range.e.c; C++) {
-        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
-        const cell = ws[cellRef];
-        if (!cell || cell.v == null) continue;
-
-        if (typeof cell.v === 'string') {
-          const val = cell.v.trim();
-
-          // yyyy-mm-dd hh:mm[:ss]
-          if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(val)) {
-            const d = new Date(val.replace(' ', 'T'));
-            if (!isNaN(d)) {
-              cell.v = d;
-              cell.t = 'd';
-              cell.z = 'yyyy-mm-dd hh:mm';
-            }
-          }
-
-          // yyyy-mm-dd
-          else if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
-            const d = new Date(val);
-            if (!isNaN(d)) {
-              cell.v = d;
-              cell.t = 'd';
-              cell.z = 'yyyy-mm-dd';
-            }
-          }
-
-          // hh:mm[:ss]
-          else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
-            const parts = val.split(':').map(Number);
-            const d = new Date(1899, 11, 30, parts[0], parts[1], parts[2] || 0);
-            cell.v = d;
-            cell.t = 'd';
-            cell.z = 'hh:mm';
-          }
-
-          // число
-          else if (!isNaN(val.replace(',', '.'))) {
-            cell.v = Number(val.replace(',', '.'));
-            cell.t = 'n';
-          }
+        const table = document.getElementById(tableId);
+        if (!table) {
+            throw new Error('HTML таблица не найдена: ' + tableId);
         }
-      }
-    }
 
-    // ====== Автоширина колонок ======
-    ws['!cols'] = [];
-    for (let C = range.s.c; C <= range.e.c; C++) {
-      let maxLen = 10;
-      for (let R = range.s.r; R <= range.e.r; R++) {
-        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-        if (cell && cell.v != null) {
-          maxLen = Math.max(maxLen, cell.v.toString().length);
+        /* === 1. Таблица → worksheet === */
+        const ws = XLSX.utils.table_to_sheet(table, {
+            raw: false,
+            cellDates: true
+        });
+
+        /* === 2. Автоширина колонок === */
+        const colWidths = [];
+        const range = XLSX.utils.decode_range(ws['!ref']);
+
+        for (let C = range.s.c; C <= range.e.c; C++) {
+            let maxLen = 10;
+            for (let R = range.s.r; R <= range.e.r; R++) {
+                const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+                if (!cell || !cell.v) continue;
+                const len = cell.v.toString().length;
+                if (len > maxLen) maxLen = len;
+            }
+            colWidths.push({ wch: maxLen + 2 });
         }
-      }
-      ws['!cols'].push({ wch: maxLen + 2 });
+        ws['!cols'] = colWidths;
+
+        /* === 3. Форматы дат и времени === */
+        Object.keys(ws).forEach(k => {
+            const cell = ws[k];
+            if (!cell || !cell.v) return;
+
+            // Date object
+            if (cell.v instanceof Date) {
+                cell.t = 'd';
+                cell.z = 'dd.mm.yyyy hh:mm';
+            }
+
+            // ISO строка даты
+            if (typeof cell.v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(cell.v)) {
+                const d = new Date(cell.v);
+                if (!isNaN(d)) {
+                    cell.v = d;
+                    cell.t = 'd';
+                    cell.z = 'dd.mm.yyyy hh:mm';
+                }
+            }
+        });
+
+        /* === 4. Workbook === */
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Данные');
+
+        /* === 5. Сохранение === */
+        const filename = `${tableId}_${formatNowForFile()}.xlsx`;
+        XLSX.writeFile(wb, filename);
+
+    } catch (e) {
+        console.error(e);
+        showErrorModal('Ошибка экспорта: ' + e.message);
+    } finally {
+        hideExportModal();
     }
-
-    // ====== Стили заголовков ======
-    for (let C = range.s.c; C <= range.e.c; C++) {
-      const headerCell = ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
-      if (headerCell) {
-        headerCell.s = {
-          font: { bold: true },
-          alignment: { horizontal: 'center' }
-        };
-      }
-    }
-
-    XLSX.utils.book_append_sheet(wb, ws, 'Данные');
-
-    const filename = `${filePrefix}_${formatNowForFile()}.xlsx`;
-    XLSX.writeFile(wb, filename);
-
-  } catch (err) {
-    console.error(err);
-    showErrorModal('Ошибка экспорта:\n' + err.message);
-  } finally {
-    hideExportModal();
-  }
 };
-</script>
