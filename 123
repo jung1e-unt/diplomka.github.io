@@ -1,70 +1,90 @@
-window.exportExcel = function (table) {
-    try {
-        showExportModal();
+    public IActionResult OnGetExport(string table, string? startDate, string? endDate, string? nPart, string? nPlaw)
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(table))
+                return BadRequest("Table is required.");
 
-        // 🔎 если передали не элемент — пробуем найти первую таблицу
-        if (!(table instanceof HTMLTableElement)) {
-            table = document.querySelector('table');
-        }
+            var tableUpper = table.Trim().ToUpperInvariant();
+            if (!AllowedTables.Contains(tableUpper))
+                return BadRequest("Table is not allowed.");
 
-        if (!table) {
-            throw new Error('HTML таблица не найдена');
-        }
+            var dateColumn = ResolveDateColumn(tableUpper);
+            var start = ParseDate(startDate);
+            var end = ParseDate(endDate);
 
-        /* === 1. Таблица → Excel === */
-        const ws = XLSX.utils.table_to_sheet(table, {
-            raw: false,
-            cellDates: true
-        });
+            var connString = _config.GetConnectionString("OracleConnection");
+            using var conn = new OracleConnection(connString);
+            conn.Open();
 
-        /* === 2. Автоширина колонок === */
-        const range = XLSX.utils.decode_range(ws['!ref']);
-        ws['!cols'] = [];
+            var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
+            if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
+                return BadRequest($"Колонка даты '{dateColumn}' отсутствует в {tableUpper}.");
 
-        for (let C = range.s.c; C <= range.e.c; C++) {
-            let maxLen = 10;
-            for (let R = range.s.r; R <= range.e.r; R++) {
-                const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-                if (cell?.v) {
-                    maxLen = Math.max(maxLen, cell.v.toString().length);
-                }
-            }
-            ws['!cols'].push({ wch: maxLen + 2 });
-        }
+            var sql = BuildSql(tableUpper, columns, dateColumn, start, end, nPart, nPlaw);
 
-        /* === 3. Формат дат/времени === */
-        Object.keys(ws).forEach(k => {
-            const cell = ws[k];
-            if (!cell || !cell.v) return;
+            using var cmd = new OracleCommand(sql, conn)
+            {
+                BindByName = true
+            };
 
-            if (cell.v instanceof Date) {
-                cell.t = 'd';
-                cell.z = 'dd.mm.yyyy hh:mm';
+            BindDateParams(cmd, start, end);
+
+            if (!string.IsNullOrWhiteSpace(nPart) &&
+                columns.Any(c => string.Equals(c, "N_PART", StringComparison.OrdinalIgnoreCase)))
+            {
+                cmd.Parameters.Add(new OracleParameter("pNPart", OracleDbType.Varchar2) { Value = nPart });
             }
 
-            // ISO строка
-            if (typeof cell.v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(cell.v)) {
-                const d = new Date(cell.v);
-                if (!isNaN(d)) {
-                    cell.v = d;
-                    cell.t = 'd';
-                    cell.z = 'dd.mm.yyyy hh:mm';
-                }
+            if (!string.IsNullOrWhiteSpace(nPlaw) &&
+                columns.Any(c => string.Equals(c, "N_PLAW", StringComparison.OrdinalIgnoreCase)))
+            {
+                cmd.Parameters.Add(new OracleParameter("pNPlaw", OracleDbType.Varchar2) { Value = nPlaw });
             }
-        });
 
-        /* === 4. Workbook === */
-        const wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Данные');
+            using var reader = cmd.ExecuteReader();
+            var dt = ToDataTable(reader);
 
-        /* === 5. Сохранение === */
-        const name = `export_${formatNowForFile()}.xlsx`;
-        XLSX.writeFile(wb, name);
+            using var wb = new XLWorkbook();
+            var ws = wb.Worksheets.Add(dt, tableUpper);
 
-    } catch (e) {
-        console.error(e);
-        showErrorModal('Ошибка экспорта: ' + e.message);
-    } finally {
-        hideExportModal();
+            var tbl = ws.Tables.FirstOrDefault();
+            if (tbl != null) tbl.ShowAutoFilter = true;
+
+            ws.SheetView.FreezeRows(1);
+            ApplyDateColumnFormats(ws, dt);
+            ApplyDateColumnFormats2(ws, dt);
+            ws.Columns().AdjustToContents();
+
+            byte[] bytes;
+            using (var ms = new MemoryStream())
+            {
+                wb.SaveAs(ms);
+                bytes = ms.ToArray();
+            }
+
+            var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
+            return File(bytes, ContentTypeXlsx, fileName);
+        }
+        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        {
+            using var wbEmpty = new XLWorkbook();
+            var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
+            wsEmpty.Cell(1, 1).Value = "Нет данных";
+            wsEmpty.Columns().AdjustToContents();
+
+            byte[] emptyBytes;
+            using (var msEmpty = new MemoryStream())
+            {
+                wbEmpty.SaveAs(msEmpty);
+                emptyBytes = msEmpty.ToArray();
+            }
+
+            return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
+        }
     }
-};
+
