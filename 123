@@ -1,33 +1,62 @@
-    private static DataTable ToDataTable(OracleDataReader reader)
-    {
-        var dt = new DataTable();
-        var schema = reader.GetColumnSchema();
+private static DataTable ToDataTable(OracleDataReader reader)
+{
+    var dt = new DataTable();
+    var schema = reader.GetColumnSchema();
 
-        foreach (var col in schema)
+    foreach (var col in schema)
+    {
+        var type = col.DataType ?? typeof(string);
+
+        if (type == typeof(object) && !string.IsNullOrEmpty(col.DataTypeName))
         {
-            var type = col.DataType ?? typeof(string);
-            if (type == typeof(object) && !string.IsNullOrEmpty(col.DataTypeName))
+            var name = col.DataTypeName.ToUpperInvariant();
+
+            if (name.Contains("DATE") || name.Contains("TIMESTAMP"))
+                type = typeof(DateTime);
+            else if (name.Contains("NUMBER"))
+                type = typeof(decimal);
+            else if (name.Contains("FLOAT") || name.Contains("BINARY_FLOAT") || name.Contains("BINARY_DOUBLE"))
+                type = typeof(double);
+        }
+
+        dt.Columns.Add(col.ColumnName, type);
+    }
+
+    while (reader.Read())
+    {
+        var row = dt.NewRow();
+
+        for (int i = 0; i < dt.Columns.Count; i++)
+        {
+            if (reader.IsDBNull(i))
             {
-                var name = col.DataTypeName.ToUpperInvariant();
-                if (name.Contains("DATE") || name.Contains("TIMESTAMP"))
-                    type = typeof(DateTime);
-                else if (name.Contains("NUMBER"))
-                    type = typeof(decimal);
-                else if (name.Contains("FLOAT") || name.Contains("BINARY_FLOAT") || name.Contains("BINARY_DOUBLE"))
-                    type = typeof(double);
+                row[i] = DBNull.Value;
+                continue;
             }
 
-            dt.Columns.Add(col.ColumnName, type);
+            var colType = dt.Columns[i].DataType;
+
+            // 🔑 КЛЮЧЕВОЕ МЕСТО
+            if (colType == typeof(decimal))
+            {
+                row[i] = reader.GetDecimal(i);   // БЕЗ ПОТЕРИ ТОЧНОСТИ
+            }
+            else if (colType == typeof(double))
+            {
+                row[i] = reader.GetDouble(i);
+            }
+            else if (colType == typeof(DateTime))
+            {
+                row[i] = reader.GetDateTime(i);
+            }
+            else
+            {
+                row[i] = reader.GetValue(i);
+            }
         }
 
-        while (reader.Read())
-        {
-            var row = dt.NewRow();
-            for (int i = 0; i < dt.Columns.Count; i++)
-                row[i] = reader.IsDBNull(i) ? DBNull.Value : reader.GetValue(i);
-
-            dt.Rows.Add(row);
-        }
-
-        return dt;
+        dt.Rows.Add(row);
     }
+
+    return dt;
+}
