@@ -21,55 +21,53 @@ window.exportExcel = async function(table) {
 
     const buffer = await resp.arrayBuffer();
 
-    // === ЧИТАЕМ XLSX ===
+    // ===== ЧИТАЕМ XLSX =====
     const wb = XLSX.read(buffer, {
       type: 'array',
-      cellDates: true
+      cellDates: false
     });
-
-    const MIN_EXCEL_DATE = new Date(1900, 0, 1);
 
     wb.SheetNames.forEach(sheetName => {
       const ws = wb.Sheets[sheetName];
+      if (!ws['!ref']) return;
 
+      // ===== ОБРАБОТКА ЯЧЕЕК =====
       Object.keys(ws).forEach(addr => {
         if (addr[0] === '!') return;
 
-        const cell = ws[addr];
-        if (!cell || cell.v == null) return;
+        const c = ws[addr];
+        if (!c || c.t !== 'n') return;
 
-        let jsDate = null;
+        const d = XLSX.SSF.parse_date_code(c.v);
+        if (!d) return;
 
-        // 1️⃣ Настоящая дата
-        if (cell.t === 'd' && cell.v instanceof Date) {
-          jsDate = cell.v;
+        // 🕒 ТОЛЬКО ВРЕМЯ (Excel хранит < 1)
+        if (c.v < 1) {
+          c.t = 's';
+          c.v = formatTime(d);
+          delete c.z;
+          return;
         }
 
-        // 2️⃣ Число, но выглядит как дата
-        if (!jsDate && cell.t === 'n') {
-          const parsed = XLSX.SSF.parse_date_code(cell.v);
-          if (parsed && parsed.y && parsed.m && parsed.d) {
-            jsDate = new Date(
-              parsed.y,
-              parsed.m - 1,
-              parsed.d,
-              parsed.H || 0,
-              parsed.M || 0,
-              parsed.S || 0
-            );
-          }
-        }
+        // 📅 ДАТА + ВРЕМЯ
+        const jsDate = new Date(
+          d.y, d.m - 1, d.d,
+          d.H || 0, d.M || 0, d.S || 0
+        );
 
-        // ❗ Если это дата и она < 1900 → в ТЕКСТ
-        if (jsDate && jsDate < MIN_EXCEL_DATE) {
-          cell.t = 's';
-          cell.v = formatDateTime(jsDate);
-          delete cell.z;
+        // ❗ Excel < 1900 → текст
+        if (jsDate < new Date(1900, 0, 1)) {
+          c.t = 's';
+          c.v = formatDateTime(jsDate);
+          delete c.z;
         }
       });
+
+      // ===== АВТОШИРИНА СТОЛБЦОВ =====
+      autoFitColumns(ws);
     });
 
-    // === ЗАПИСЫВАЕМ НОВЫЙ XLSX ===
+    // ===== СОХРАНЯЕМ XLSX =====
     const out = XLSX.write(wb, {
       bookType: 'xlsx',
       type: 'array'
@@ -89,7 +87,38 @@ window.exportExcel = async function(table) {
   }
 };
 
-// ===== helpers =====
+// ================= HELPERS =================
+
+function formatTime(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.H)}:${p(d.M)}`;
+}
+
+function formatDateTime(d) {
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function autoFitColumns(ws) {
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const cols = [];
+
+  for (let C = range.s.c; C <= range.e.c; C++) {
+    let maxLen = 8;
+
+    for (let R = range.s.r; R <= range.e.r; R++) {
+      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+      if (!cell || cell.v == null) continue;
+
+      const val = String(cell.v);
+      maxLen = Math.max(maxLen, val.length);
+    }
+
+    cols[C] = { wch: Math.min(maxLen + 2, 40) };
+  }
+
+  ws['!cols'] = cols;
+}
 
 function download(blob, name) {
   const url = URL.createObjectURL(blob);
@@ -102,14 +131,9 @@ function download(blob, name) {
   URL.revokeObjectURL(url);
 }
 
-function formatDateTime(d) {
-  const p = n => n.toString().padStart(2, '0');
-  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 function formatNowForFile() {
   const d = new Date();
-  const p = n => n.toString().padStart(2,'0');
+  const p = n => String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
 }
 </script>
