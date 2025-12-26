@@ -1,46 +1,48 @@
-window.exportExcel = function (tableId) {
+window.exportExcel = function (table) {
     try {
         showExportModal();
 
-        const table = document.getElementById(tableId);
-        if (!table) {
-            throw new Error('HTML таблица не найдена: ' + tableId);
+        // 🔎 если передали не элемент — пробуем найти первую таблицу
+        if (!(table instanceof HTMLTableElement)) {
+            table = document.querySelector('table');
         }
 
-        /* === 1. Таблица → worksheet === */
+        if (!table) {
+            throw new Error('HTML таблица не найдена');
+        }
+
+        /* === 1. Таблица → Excel === */
         const ws = XLSX.utils.table_to_sheet(table, {
             raw: false,
             cellDates: true
         });
 
         /* === 2. Автоширина колонок === */
-        const colWidths = [];
         const range = XLSX.utils.decode_range(ws['!ref']);
+        ws['!cols'] = [];
 
         for (let C = range.s.c; C <= range.e.c; C++) {
             let maxLen = 10;
             for (let R = range.s.r; R <= range.e.r; R++) {
                 const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-                if (!cell || !cell.v) continue;
-                const len = cell.v.toString().length;
-                if (len > maxLen) maxLen = len;
+                if (cell?.v) {
+                    maxLen = Math.max(maxLen, cell.v.toString().length);
+                }
             }
-            colWidths.push({ wch: maxLen + 2 });
+            ws['!cols'].push({ wch: maxLen + 2 });
         }
-        ws['!cols'] = colWidths;
 
-        /* === 3. Форматы дат и времени === */
+        /* === 3. Формат дат/времени === */
         Object.keys(ws).forEach(k => {
             const cell = ws[k];
             if (!cell || !cell.v) return;
 
-            // Date object
             if (cell.v instanceof Date) {
                 cell.t = 'd';
                 cell.z = 'dd.mm.yyyy hh:mm';
             }
 
-            // ISO строка даты
+            // ISO строка
             if (typeof cell.v === 'string' && /^\d{4}-\d{2}-\d{2}/.test(cell.v)) {
                 const d = new Date(cell.v);
                 if (!isNaN(d)) {
@@ -56,8 +58,8 @@ window.exportExcel = function (tableId) {
         XLSX.utils.book_append_sheet(wb, ws, 'Данные');
 
         /* === 5. Сохранение === */
-        const filename = `${tableId}_${formatNowForFile()}.xlsx`;
-        XLSX.writeFile(wb, filename);
+        const name = `export_${formatNowForFile()}.xlsx`;
+        XLSX.writeFile(wb, name);
 
     } catch (e) {
         console.error(e);
