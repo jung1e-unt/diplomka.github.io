@@ -29,7 +29,7 @@ public class IndexModel : PageModel
     "lnpp.JASH_1_DUBL","lnpp.JASH_2","lnpp.JASH_2_DUBL","lnpp.LAB_LNPP","lnpp.LNGC_DATACENTR","lnpp.LNGC_OTK","lnpp.LNGC_OTK_DUBLE","lnpp.LPC3_MM",
     "lnpp.MEX_CGCA","lnpp.MEX_CGCA_LOG","lnpp.MEX_LAB_OB","lnpp.MEX_LPC1","lnpp.MEX_LPC1_DUBLE","lnpp.MEX_LPC1_LOG","lnpp.MEX_LPC2","lnpp.MEX_LPC2_LOG",
     "lnpp.MEX_LPC3","lnpp.MEX_LPC3_LOG","lnpp.MEX_LPC3_UCH","lnpp.MEX_LPC3_UCH_LOG","lnpp.MEX_SPC","lnpp.MEX_TRUBN","lnpp.MEX_TRUBN_LOG","lnpp.MICRO_CGCA",
-    "lnpp.MICRO_LPC1","lnpp.MICRO_LPC1_NEW","lnpp.MICRO_LPC2","lnpp.MICRO_LPC3","lnpp.NDC_DUBLE_LNPP","lnpp.NDC_LNPP","lnpp.OTGR_CGCA","lnpp.OTGR_CGCA_NEW",
+    "lnpp.MICRO_LPC1","lnpp.MICRO_LPC1_NEW","lnpp.MICRO_LPC2","lnpp.MICRO_LPC3","lnpp.NDC_LNPP_DUBLE","lnpp.NDC_LNPP","lnpp.OTGR_CGCA","lnpp.OTGR_CGCA_NEW",
     "lnpp.OTGR_CGCA_OLD","lnpp.OTK","lnpp.PROD_LNPP","lnpp.PROD_LNPP_OLD","lnpp.PROIZ_LPC3","lnpp.PROIZV_ANGA","lnpp.PROIZV_ANGA_PRODUCTIV","lnpp.PROIZV_CGCA",
     "lnpp.PROIZV_LKPP_OLD","lnpp.PROIZV_LNGC","lnpp.PROIZV_LNGC_PRODUCTIV","lnpp.PROIZV_LNPP","lnpp.PROIZV_LNPP_OLD","lnpp.PROIZV_LNPP_PROD_NEW",
     "lnpp.PROIZV_LNPP_PRODUCTIV","lnpp.PROKAT_SMAZ","lnpp.PRPROKAT_CEXA","lnpp.RASTVOR_LNPP","lnpp.RASTVOR_OPXR2",
@@ -38,7 +38,6 @@ public class IndexModel : PageModel
     };
 
     private static readonly Dictionary<string, string> DefaultDateColumnByTable =
-        //
 new(StringComparer.OrdinalIgnoreCase)
 {
     ["lnpp.ANGA_OTK"] = "DATA",
@@ -74,18 +73,17 @@ new(StringComparer.OrdinalIgnoreCase)
     ["lnpp.MEX_SPC"] = "DATA_ID",
     ["lnpp.MEX_TRUBN"] = "DATA_ID",
     ["lnpp.MEX_TRUBN_LOG"] = "DATA_ID",
-    ["lnpp.MICRO_CGCA"] = "CREATED_ID",
-    ["lnpp.MICRO_LPC1"] = "CREATED_ID",
-    ["lnpp.MICRO_LPC1_NEW"] = "DATE_MICRO",
+    ["lnpp.MICRO_CGCA"] = "CREATED_DATE",
+    ["lnpp.MICRO_LPC1"] = "CREATED_DATE",
     ["lnpp.MICRO_LPC2"] = "CREATED_DATE",
     ["lnpp.MICRO_LPC3"] = "CREATED_DATE",
-    ["lnpp.NDC_DUBLE_LNPP"] = "SAMPLE_DATETIME",
+    ["lnpp.NDC_LNPP_DUBLE"] = "SAMPLE_DATETIME",
     ["lnpp.NDC_LNPP"] = "SAMPLE_DATETIME",
     ["lnpp.OTGR_CGCA"] = "DATA_CEHA",
     ["lnpp.OTGR_CGCA_NEW"] = "DATA_CEHA",
     ["lnpp.OTGR_CGCA_OLD"] = "DATA_CEHA",
     ["lnpp.OTK"] = "DATA",
-    ["lnpp.PROD_LNPP"] = "DATE_NACH",
+    ["lnpp.PROD_LNPP"] = "DATA",
     ["lnpp.PROD_LNPP_OLD"] = "DATA",
     ["lnpp.PROIZ_LPC3"] = "DATA",
     ["lnpp.PROIZV_ANGA"] = "DATA",
@@ -196,7 +194,12 @@ new(StringComparer.OrdinalIgnoreCase)
                     }
                     else if (raw is DateTime dt)
                     {
-                        if (TimeColumns.Contains(col.ColumnName))
+
+                        if (TimeColumns2.Contains(col.ColumnName))
+                        {
+                            row[col.ColumnName] = dt.ToString("hh:mm");
+                        }
+                        else if (TimeColumns.Contains(col.ColumnName))
                         {
                             row[col.ColumnName] = dt.ToString("dd.MM.yyyy hh:mm:ss");
                         }
@@ -341,6 +344,7 @@ FROM {tableUpper}
 
             ws.SheetView.FreezeRows(1);
             ApplyDateColumnFormats(ws, dt);
+            ApplyDateColumnFormats2(ws, dt);
             ws.Columns().AdjustToContents();
 
             byte[] bytes;
@@ -536,12 +540,16 @@ FROM {tableUpper}
     }
 
 
-    private static readonly HashSet<string> TimeColumns =
-        new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> TimeColumns = new(StringComparer.OrdinalIgnoreCase)
     {
-    "created_date", "updated_date", "deleted_date","create_date","sample_datetime","date_create"
+    "created_date", "updated_date", "deleted_date","create_date","sample_datetime","date_create",
+
     };
 
+    private static readonly HashSet<string> TimeColumns2 = new(StringComparer.OrdinalIgnoreCase)
+    {
+    "TIMES_NACH","TIMES_KON","T1","VREMYA"
+    };
 
     private static DataTable ToDataTable(OracleDataReader reader)
     {
@@ -669,7 +677,7 @@ FROM {tableUpper}
     //        hasMore
     //    });
     //} 
-        
+
 
     //private static List<string> ExtractTablesFromSql(string sql)
     //{
@@ -696,30 +704,60 @@ FROM {tableUpper}
 
     private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt)
     {
-        // Целевые столбцы, которым нужен формат с временем
         var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        "created_date", "updated_date", "deleted_date","create_date","sample_datetime","date_create"
+        "created_date", "updated_date", "deleted_date",
+        "create_date", "sample_datetime", "date_create"
     };
 
         for (int i = 0; i < dt.Columns.Count; i++)
         {
             var col = dt.Columns[i];
 
-            if (col.DataType == typeof(DateTime))
-            {
-                if (timeColumns.Contains(col.ColumnName))
-                {
-                    ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yyyy hh:mm:ss";
+            if (col.DataType != typeof(DateTime))
+                continue;
 
-                }
-                else
-                {
-                    ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yyyy";
-                }
+            if (timeColumns.Contains(col.ColumnName))
+            {
+                ws.Column(i + 1).Style.NumberFormat.Format = "dd.MM.yyyy HH:mm";
+            }
+            else
+            {
+                ws.Column(i + 1).Style.NumberFormat.Format = "dd.MM.yyyy";
             }
         }
     }
 
+    private static void ApplyDateColumnFormats2(IXLWorksheet ws, DataTable dt)
+    {
+        var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "TIMES_NACH", "TIMES_KON", "T1", "VREMYA"
+    };
+
+        for (int i = 0; i < dt.Columns.Count; i++)
+        {
+            var col = dt.Columns[i];
+
+            if (col.DataType != typeof(DateTime))
+                continue;
+
+            if (!timeColumns.Contains(col.ColumnName))
+                continue;
+
+            var xlCol = ws.Column(i + 1);
+
+            foreach (var cell in xlCol.CellsUsed().Skip(1)) // без заголовка
+            {
+                if (cell.TryGetValue<DateTime>(out var dtVal))
+                {
+                    // КЛЮЧЕВО: DateTime → TimeSpan
+                    cell.Value = dtVal.TimeOfDay;
+                }
+            }
+
+            xlCol.Style.NumberFormat.Format = "hh:mm";
+        }
+    }
 
 }
