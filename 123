@@ -1,2 +1,15 @@
-var ws = wb.Worksheets.Add(tableUpper);
-ws.Cell(1, 1).InsertData(dt);
+private static void ApplyNumericFormats(IXLWorksheet ws, DataTable dt)
+{
+    for (int i = 0; i < dt.Columns.Count; i++)
+    {
+        var col = dt.Columns[i];
+
+        if (col.DataType == typeof(decimal) ||
+            col.DataType == typeof(double) ||
+            col.DataType == typeof(float))
+        {
+            ws.Column(i + 1).Style.NumberFormat.Format =
+                "#,##0.################";
+        }
+    }
+}
