@@ -1,152 +1,134 @@
 <script>
-window.exportExcel = async function(table) {
+/* =========================
+   ВСПОМОГАТЕЛЬНЫЕ МОДАЛКИ
+   (если у тебя уже есть — можешь удалить)
+========================= */
+
+function showExportModal() {
+  console.log('Экспорт...');
+}
+
+function hideExportModal() {
+  console.log('Экспорт завершён');
+}
+
+function showErrorModal(msg) {
+  alert(msg);
+}
+
+/* =========================
+   ФОРМАТ ИМЕНИ ФАЙЛА
+========================= */
+
+function formatNowForFile(){
+  const d = new Date();
+  return `${d.getFullYear()}-${(d.getMonth()+1).toString().padStart(2,'0')}-${d.getDate().toString().padStart(2,'0')}_` +
+         `${d.getHours().toString().padStart(2,'0')}-${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+/* =========================
+   ОСНОВНОЙ ЭКСПОРТ EXCEL
+========================= */
+
+window.exportExcel = function(tableSelector, filePrefix = 'export') {
   showExportModal();
+
   try {
-    const p = collectFilterParams();
-    if (table) p.set('table', table);
+    const table = document.querySelector(tableSelector);
+    if (!table) {
+      throw new Error('HTML-таблица не найдена');
+    }
 
-    const sep = exportBaseUrl.includes('?') ? '&' : '?';
-    const url = `${exportBaseUrl}${sep}${p.toString()}`;
-
-    const resp = await fetch(url);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-
-    const cd = resp.headers.get('Content-Disposition') || '';
-    const m  = cd.match(/filename\*=UTF-8''([^;]+)|filename="?([^\";]+)"?/i);
-    const raw = m ? (m[1] || m[2]) : null;
-
-    const fileName = raw
-      ? decodeURIComponent(raw)
-      : `${(table || 'export')}_${formatNowForFile()}.xlsx`;
-
-    const buffer = await resp.arrayBuffer();
-
-    const wb = XLSX.read(buffer, {
-      type: 'array',
-      cellDates: false
+    // Создание книги и листа
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.table_to_sheet(table, {
+      raw: true
     });
 
-    wb.SheetNames.forEach(sheetName => {
-      const ws = wb.Sheets[sheetName];
-      if (!ws['!ref']) return;
+    const range = XLSX.utils.decode_range(ws['!ref']);
 
-      Object.keys(ws).forEach(addr => {
-        if (addr[0] === '!') return;
+    // ====== Приведение типов ======
+    for (let R = range.s.r + 1; R <= range.e.r; R++) {
+      for (let C = range.s.c; C <= range.e.c; C++) {
+        const cellRef = XLSX.utils.encode_cell({ r: R, c: C });
+        const cell = ws[cellRef];
+        if (!cell || cell.v == null) continue;
 
-        const c = ws[addr];
-        if (!c || c.t !== 'n' || typeof c.v !== 'number') return;
+        if (typeof cell.v === 'string') {
+          const val = cell.v.trim();
 
-        const v = c.v;
-        const abs = Math.abs(v);
-        const frac = abs % 1;
-
-        // ================= 🕒 ЧИСТОЕ ВРЕМЯ =================
-        if (abs < 1 && frac > 0) {
-          const minutes = Math.round(frac * 1440);
-          const h = Math.floor(minutes / 60) % 24;
-          const m = minutes % 60;
-
-          c.t = 's';
-          c.v = `${pad(h)}:${pad(m)}`;
-          delete c.z;
-          return;
-        }
-
-        // ================= 📅 ДАТА / ДАТА+ВРЕМЯ =================
-        if (abs >= 1 && abs < 60000) { // защита от обычных чисел
-          const d = XLSX.SSF.parse_date_code(v);
-          if (!d || !d.y) return;
-
-          const jsDate = new Date(
-            d.y, d.m - 1, d.d,
-            d.H || 0, d.M || 0, d.S || 0
-          );
-
-          // ДО 1900 → текст
-          if (jsDate < new Date(1900, 0, 1)) {
-            c.t = 's';
-            c.v = frac > 0
-              ? formatDateTime(jsDate)
-              : formatDate(jsDate);
-            delete c.z;
-            return;
+          // yyyy-mm-dd hh:mm[:ss]
+          if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(val)) {
+            const d = new Date(val.replace(' ', 'T'));
+            if (!isNaN(d)) {
+              cell.v = d;
+              cell.t = 'd';
+              cell.z = 'yyyy-mm-dd hh:mm';
+            }
           }
 
-          // >= 1900 → оставляем числом (Excel сам форматирует)
-          if (frac === 0) {
-            c.z = 'dd.mm.yyyy';
-          } else {
-            c.z = 'dd.mm.yyyy hh:mm';
+          // yyyy-mm-dd
+          else if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+            const d = new Date(val);
+            if (!isNaN(d)) {
+              cell.v = d;
+              cell.t = 'd';
+              cell.z = 'yyyy-mm-dd';
+            }
+          }
+
+          // hh:mm[:ss]
+          else if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(val)) {
+            const parts = val.split(':').map(Number);
+            const d = new Date(1899, 11, 30, parts[0], parts[1], parts[2] || 0);
+            cell.v = d;
+            cell.t = 'd';
+            cell.z = 'hh:mm';
+          }
+
+          // число
+          else if (!isNaN(val.replace(',', '.'))) {
+            cell.v = Number(val.replace(',', '.'));
+            cell.t = 'n';
           }
         }
-      });
+      }
+    }
 
-      autoFitColumns(ws);
+    // ====== Автоширина колонок ======
+    ws['!cols'] = [];
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      let maxLen = 10;
+      for (let R = range.s.r; R <= range.e.r; R++) {
+        const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
+        if (cell && cell.v != null) {
+          maxLen = Math.max(maxLen, cell.v.toString().length);
+        }
+      }
+      ws['!cols'].push({ wch: maxLen + 2 });
+    }
 
-      // фильтр по заголовкам
-      ws['!autofilter'] = { ref: ws['!ref'] };
-    });
+    // ====== Стили заголовков ======
+    for (let C = range.s.c; C <= range.e.c; C++) {
+      const headerCell = ws[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+      if (headerCell) {
+        headerCell.s = {
+          font: { bold: true },
+          alignment: { horizontal: 'center' }
+        };
+      }
+    }
 
-    const out = XLSX.write(wb, {
-      bookType: 'xlsx',
-      type: 'array'
-    });
+    XLSX.utils.book_append_sheet(wb, ws, 'Данные');
 
-    const blob = new Blob([out], {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
+    const filename = `${filePrefix}_${formatNowForFile()}.xlsx`;
+    XLSX.writeFile(wb, filename);
 
-    download(blob, fileName);
-
-  } catch (e) {
-    console.error(e);
-    showErrorModal('Ошибка экспорта: ' + e.message);
+  } catch (err) {
+    console.error(err);
+    showErrorModal('Ошибка экспорта:\n' + err.message);
   } finally {
     hideExportModal();
   }
 };
-
-// ================= HELPERS =================
-
-const pad = n => String(n).padStart(2,'0');
-
-function formatDate(d) {
-  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`;
-}
-
-function formatDateTime(d) {
-  return `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-function autoFitColumns(ws) {
-  const range = XLSX.utils.decode_range(ws['!ref']);
-  const cols = [];
-
-  for (let C = range.s.c; C <= range.e.c; C++) {
-    let maxLen = 8;
-    for (let R = range.s.r; R <= range.e.r; R++) {
-      const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
-      if (!cell || cell.v == null) continue;
-      maxLen = Math.max(maxLen, String(cell.v).length);
-    }
-    cols[C] = { wch: Math.min(maxLen + 2, 40) };
-  }
-  ws['!cols'] = cols;
-}
-
-function download(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-function formatNowForFile() {
-  const d = new Date();
-  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
-}
 </script>
