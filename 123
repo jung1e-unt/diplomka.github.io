@@ -1,370 +1,151 @@
-using ClosedXML.Excel;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
-using Microsoft.Extensions.Configuration;
-using Oracle.ManagedDataAccess.Client;
-using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Data.Common;
-using System.Globalization;
-using System.IO;
-using System.Linq;
-using System.Text.Json;
-
-public class IndexModel : PageModel
+public IActionResult OnGetExport(string table, string? startDate, string? endDate, string? nPart, string? nPlaw)
 {
-    private readonly IConfiguration _config;
-
-    public IndexModel(IConfiguration config)
-    {
-        _config = config;
-    }
-
-    // Разрешённые таблицы
-    public static readonly HashSet<string> AllowedTables = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "lnpp.ANGA_OTK","lnpp.AUO_OPXR","lnpp.BMC_1_2","lnpp.DATACENTR","lnpp.DATACENTR_OLD","lnpp.EXCEL3","lnpp.GEST","lnpp.JA_1","lnpp.JA_2","lnpp.JASH_1",
-        "lnpp.JASH_1_DUBL","lnpp.JASH_2","lnpp.JASH_2_DUBL","lnpp.LAB_LNPP","lnpp.LNGC_DATACENTR","lnpp.LNGC_OTK","lnpp.LNGC_OTK_DUBLE","lnpp.LPC3_MM",
-        "lnpp.MEX_CGCA","lnpp.MEX_CGCA_LOG","lnpp.MEX_LAB_OB","lnpp.MEX_LPC1","lnpp.MEX_LPC1_DUBLE","lnpp.MEX_LPC1_LOG","lnpp.MEX_LPC2","lnpp.MEX_LPC2_LOG",
-        "lnpp.MEX_LPC3","lnpp.MEX_LPC3_LOG","lnpp.MEX_LPC3_UCH","lnpp.MEX_LPC3_UCH_LOG","lnpp.MEX_SPC","lnpp.MEX_TRUBN","lnpp.MEX_TRUBN_LOG","lnpp.MICRO_CGCA",
-        "lnpp.MICRO_LPC1","lnpp.MICRO_LPC1_NEW","lnpp.MICRO_LPC2","lnpp.MICRO_LPC3","lnpp.NDC_LNPP_DUBLE","lnpp.NDC_LNPP","lnpp.OTGR_CGCA","lnpp.OTGR_CGCA_NEW",
-        "lnpp.OTGR_CGCA_OLD","lnpp.OTK","lnpp.PROD_LNPP","lnpp.PROD_LNPP_OLD","lnpp.PROIZ_LPC3","lnpp.PROIZV_ANGA","lnpp.PROIZV_ANGA_PRODUCTIV","lnpp.PROIZV_CGCA",
-        "lnpp.PROIZV_LKPP_OLD","lnpp.PROIZV_LNGC","lnpp.PROIZV_LNGC_PRODUCTIV","lnpp.PROIZV_LNPP","lnpp.PROIZV_LNPP_OLD","lnpp.PROIZV_LNPP_PROD_NEW",
-        "lnpp.PROIZV_LNPP_PRODUCTIV","lnpp.PROKAT_SMAZ","lnpp.PRPROKAT_CEXA","lnpp.RASTVOR_LNPP","lnpp.RASTVOR_OPXR2",
-        "lnpp.XIM_VODA","lnpp.XIMBXU_LPC2","lnpp.XIMKISLOTA_LPC2","lnpp.XIMMASLO_LPC2","lnpp.XIMMUL_LPC2","lnpp.XIMNTA_LPC2","lnpp.XIMVXKONTR_LPC3",
-        "lnpp.XIMXROM_LPC3"
-    };
-
-    private static readonly Dictionary<string, string> DefaultDateColumnByTable =
-        new(StringComparer.OrdinalIgnoreCase)
-    {
-        ["lnpp.ANGA_OTK"] = "DATA",
-        ["lnpp.AUO_OPXR"] = "DATA_ID",
-        ["lnpp.BMC_1_2"] = "DATA_ID",
-        ["lnpp.DATACENTR"] = "SAMPLE_DATETIME",
-        ["lnpp.DATACENTR_OLD"] = "SAMPLE_DATETIME",
-        ["lnpp.EXCEL3"] = "",
-        ["lnpp.GEST"] = "DATA_ID",
-        ["lnpp.JA_1"] = "SAMPLE_DATETIME",
-        ["lnpp.JA_2"] = "SAMPLE_DATETIME",
-        ["lnpp.JASH_1"] = "SAMPLE_DATETIME",
-        ["lnpp.JASH_1_DUBL"] = "SAMPLE_DATETIME",
-        ["lnpp.JASH_2"] = "SAMPLE_DATETIME",
-        ["lnpp.JASH_2_DUBL"] = "SAMPLE_DATETIME",
-        ["lnpp.LAB_LNPP"] = "DATA",
-        ["lnpp.LNGC_DATACENTR"] = "SAMPLE_DATETIME",
-        ["lnpp.LNGC_OTK"] = "DATA",
-        ["lnpp.LNGC_OTK_DUBLE"] = "SAMPLE_DATETIME",
-        ["lnpp.LPC3_MM"] = "DATA_PR",
-        ["lnpp.MEX_CGCA"] = "DATA_ID",
-        ["lnpp.MEX_CGCA_LOG"] = "DATA_ID",
-        ["lnpp.MEX_LAB_OB"] = "DATA_ID_CG",
-        ["lnpp.MEX_LPC1"] = "DATA_ID",
-        ["lnpp.MEX_LPC1_DUBLE"] = "DATA_ID",
-        ["lnpp.MEX_LPC1_LOG"] = "DATA_ID",
-        ["lnpp.MEX_LPC2"] = "DATA_ID",
-        ["lnpp.MEX_LPC2_LOG"] = "DATA_ID",
-        ["lnpp.MEX_LPC3"] = "DATA_ID",
-        ["lnpp.MEX_LPC3_LOG"] = "DATA_ID",
-        ["lnpp.MEX_LPC3_UCH"] = "DATA_ID",
-        ["lnpp.MEX_LPC3_UCH_LOG"] = "DATA_ID",
-        ["lnpp.MEX_SPC"] = "DATA_ID",
-        ["lnpp.MEX_TRUBN"] = "DATA_ID",
-        ["lnpp.MEX_TRUBN_LOG"] = "DATA_ID",
-        ["lnpp.MICRO_CGCA"] = "CREATED_DATE",
-        ["lnpp.MICRO_LPC1"] = "CREATED_DATE",
-        ["lnpp.MICRO_LPC2"] = "CREATED_DATE",
-        ["lnpp.MICRO_LPC3"] = "CREATED_DATE",
-        ["lnpp.NDC_LNPP_DUBLE"] = "SAMPLE_DATETIME",
-        ["lnpp.NDC_LNPP"] = "SAMPLE_DATETIME",
-        ["lnpp.OTGR_CGCA"] = "DATA_CEHA",
-        ["lnpp.OTGR_CGCA_NEW"] = "DATA_CEHA",
-        ["lnpp.OTGR_CGCA_OLD"] = "DATA_CEHA",
-        ["lnpp.OTK"] = "DATA",
-        ["lnpp.PROD_LNPP"] = "DATA",
-        ["lnpp.PROD_LNPP_OLD"] = "DATA",
-        ["lnpp.PROIZ_LPC3"] = "DATA",
-        ["lnpp.PROIZV_ANGA"] = "DATA",
-        ["lnpp.PROIZV_ANGA_PRODUCTIV"] = "DATA",
-        ["lnpp.PROIZV_CGCA"] = "DATA",
-        ["lnpp.PROIZV_LKPP_OLD"] = "DATA",
-        ["lnpp.PROIZV_LNGC"] = "DATA",
-        ["lnpp.PROIZV_LNGC_PRODUCTIV"] = "DATA",
-        ["lnpp.PROIZV_LNPP"] = "DATA",
-        ["lnpp.PROIZV_LNPP_OLD"] = "DATA",
-        ["lnpp.PROIZV_LNPP_PROD_NEW"] = "DATA",
-        ["lnpp.PROIZV_LNPP_PRODUCTIV"] = "DATA",
-        ["lnpp.PROKAT_SMAZ"] = "DATA_ID",
-        ["lnpp.PRPROKAT_CEXA"] = "DATA_ID",
-        ["lnpp.RASTVOR_LNPP"] = "DATA",
-        ["lnpp.RASTVOR_OPXR2"] = "DATA_ID",
-        ["lnpp.XIM_VODA"] = "DATA_ID",
-        ["lnpp.XIMBXU_LPC2"] = "DATA_ID",
-        ["lnpp.XIMKISLOTA_LPC2"] = "DATA_ID",
-        ["lnpp.XIMMASLO_LPC2"] = "DATA_ID",
-        ["lnpp.XIMMUL_LPC2"] = "DATA_ID",
-        ["lnpp.XIMNTA_LPC2"] = "DATA_ID",
-        ["lnpp.XIMVXKONTR_LPC3"] = "DATA_ID",
-        ["lnpp.XIMXROM_LPC3"] = "DATA_ID"
-    };
-
-    private static readonly HashSet<string> DefaultExcludeColumns =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            "ORA_ROWSCN","SYS_CREATION_DATE","SYS_UPDATE_DATE"
-        };
-
-    private const string ContentTypeXlsx = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
-
-    public IActionResult OnGetData(
-        string table,
-        string? startDate,
-        string? endDate,
-        string? nPart,
-        string? nPlaw,
-        int? offset,
-        int? pageSize
-    )
+    try
     {
         if (string.IsNullOrWhiteSpace(table))
-            return new JsonResult(new { error = "Table is required." }) { StatusCode = 400 };
+            return BadRequest("Table is required.");
 
         var tableUpper = table.Trim().ToUpperInvariant();
         if (!AllowedTables.Contains(tableUpper))
-            return new JsonResult(new { error = "Table is not allowed." }) { StatusCode = 400 };
+            return BadRequest("Table is not allowed.");
 
         var dateColumn = ResolveDateColumn(tableUpper);
         var start = ParseDate(startDate);
         var end = ParseDate(endDate);
 
-        var take = Math.Clamp(pageSize ?? 100, 1, 1000);
-        var skip = Math.Max(offset ?? 0, 0);
-
         var connString = _config.GetConnectionString("OracleConnection");
         using var conn = new OracleConnection(connString);
         conn.Open();
 
-        try
+        var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
+        if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
+            return BadRequest($"Колонка даты '{dateColumn}' отсутствует в {tableUpper}.");
+
+        var sql = BuildSql(tableUpper, columns, dateColumn, start, end, nPart, nPlaw);
+
+        using var cmd = new OracleCommand(sql, conn)
         {
-            var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
+            BindByName = true
+        };
 
-            if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
-                return new JsonResult(new { error = $"Колонка даты '{dateColumn}' отсутствует в {tableUpper}." }) { StatusCode = 500 };
+        BindDateParams(cmd, start, end);
 
-            var orderBy = dateColumn;
-            if (string.IsNullOrWhiteSpace(orderBy) || !columns.Contains(orderBy, StringComparer.OrdinalIgnoreCase))
-                orderBy = columns[0];
+        if (!string.IsNullOrWhiteSpace(nPart) &&
+            columns.Any(c => string.Equals(c, "N_PART", StringComparison.OrdinalIgnoreCase)))
+        {
+            cmd.Parameters.Add(new OracleParameter("pNPart", OracleDbType.Varchar2) { Value = nPart });
+        }
 
-            var sql = BuildSqlPaged(tableUpper, columns, dateColumn, start, end, nPart, nPlaw, orderBy, skip, take);
-            using var cmd = new OracleCommand(sql, conn);
-            BindDateParams(cmd, start, end);
+        if (!string.IsNullOrWhiteSpace(nPlaw) &&
+            columns.Any(c => string.Equals(c, "N_PLAW", StringComparison.OrdinalIgnoreCase)))
+        {
+            cmd.Parameters.Add(new OracleParameter("pNPlaw", OracleDbType.Varchar2) { Value = nPlaw });
+        }
 
-            if (!string.IsNullOrWhiteSpace(nPart) &&
-                columns.Any(c => string.Equals(c, "N_PART", StringComparison.OrdinalIgnoreCase)))
+        using var reader = cmd.ExecuteReader();
+
+        // === КЛЮЧЕВАЯ ЧАСТЬ: ручное создание DataTable с сохранением точности чисел как строк ===
+        var schema = reader.GetColumnSchema();
+        var dt = new DataTable();
+
+        // Создаём колонки
+        foreach (var col in schema)
+        {
+            var columnName = col.ColumnName;
+            var dataType = col.DataType ?? typeof(object);
+
+            // Если это число с плавающей точкой — делаем колонку строковой для полной точности
+            if (dataType == typeof(decimal) || dataType == typeof(double) || dataType == typeof(float))
             {
-                cmd.Parameters.Add(new OracleParameter("pNPart", nPart));
+                dt.Columns.Add(columnName, typeof(string));
             }
-
-            if (!string.IsNullOrWhiteSpace(nPlaw) &&
-                columns.Any(c => string.Equals(c, "N_PLAW", StringComparison.OrdinalIgnoreCase)))
+            else
             {
-                cmd.Parameters.Add(new OracleParameter("pNPlaw", nPlaw));
+                dt.Columns.Add(columnName, dataType);
             }
+        }
 
-            var rows = new List<Dictionary<string, object?>>(capacity: take);
-            using var reader = cmd.ExecuteReader();
-            var schema = reader.GetColumnSchema();
+        // Заполняем строки
+        while (reader.Read())
+        {
+            var row = dt.NewRow();
 
-            while (reader.Read())
+            for (int i = 0; i < dt.Columns.Count; i++)
             {
-                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-
-                foreach (var col in schema)
+                if (reader.IsDBNull(i))
                 {
-                    var raw = reader[col.ColumnName];
-
-                    if (raw == DBNull.Value)
-                    {
-                        row[col.ColumnName] = null;
-                    }
-                    else if (raw is DateTime dt)
-                    {
-                        if (TimeColumns2.Contains(col.ColumnName))
-                        {
-                            row[col.ColumnName] = dt.ToString("hh:mm");
-                        }
-                        else if (TimeColumns.Contains(col.ColumnName))
-                        {
-                            row[col.ColumnName] = dt.ToString("dd.MM.yyyy hh:mm:ss");
-                        }
-                        else
-                        {
-                            row[col.ColumnName] = dt.ToString("dd.MM.yyyy");
-                        }
-                    }
-                    else
-                    {
-                        // КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: сохраняем полную точность чисел как строку
-                        if (raw is decimal || raw is double || raw is float)
-                        {
-                            row[col.ColumnName] = Convert.ToDecimal(raw).ToString("G17", CultureInfo.InvariantCulture);
-                        }
-                        else
-                        {
-                            row[col.ColumnName] = raw;
-                        }
-                    }
+                    row[i] = DBNull.Value;
+                    continue;
                 }
 
-                rows.Add(row);
-            }
+                var raw = reader[i];
 
-            bool hasMore = false;
-            if (rows.Count > take)
-            {
-                hasMore = true;
-                rows.RemoveAt(rows.Count - 1);
-            }
-
-            return new JsonResult(new
-            {
-                data = rows,
-                nextOffset = skip + rows.Count,
-                hasMore
-            }, new JsonSerializerOptions { PropertyNamingPolicy = null, WriteIndented = false });
-        }
-        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
-        {
-            return new JsonResult(new { data = Array.Empty<object>(), nextOffset = skip, hasMore = false });
-        }
-    }
-
-    public IActionResult OnGetExport(string table, string? startDate, string? endDate, string? nPart, string? nPlaw)
-    {
-        try
-        {
-            if (string.IsNullOrWhiteSpace(table))
-                return BadRequest("Table is required.");
-
-            var tableUpper = table.Trim().ToUpperInvariant();
-            if (!AllowedTables.Contains(tableUpper))
-                return BadRequest("Table is not allowed.");
-
-            var dateColumn = ResolveDateColumn(tableUpper);
-            var start = ParseDate(startDate);
-            var end = ParseDate(endDate);
-
-            var connString = _config.GetConnectionString("OracleConnection");
-            using var conn = new OracleConnection(connString);
-            conn.Open();
-
-            var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
-            if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
-                return BadRequest($"Колонка даты '{dateColumn}' отсутствует в {tableUpper}.");
-
-            var sql = BuildSql(tableUpper, columns, dateColumn, start, end, nPart, nPlaw);
-
-            using var cmd = new OracleCommand(sql, conn)
-            {
-                BindByName = true
-            };
-
-            BindDateParams(cmd, start, end);
-
-            if (!string.IsNullOrWhiteSpace(nPart) &&
-                columns.Any(c => string.Equals(c, "N_PART", StringComparison.OrdinalIgnoreCase)))
-            {
-                cmd.Parameters.Add(new OracleParameter("pNPart", OracleDbType.Varchar2) { Value = nPart });
-            }
-
-            if (!string.IsNullOrWhiteSpace(nPlaw) &&
-                columns.Any(c => string.Equals(c, "N_PLAW", StringComparison.OrdinalIgnoreCase)))
-            {
-                cmd.Parameters.Add(new OracleParameter("pNPlaw", OracleDbType.Varchar2) { Value = nPlaw });
-            }
-
-            using var reader = cmd.ExecuteReader();
-            var dt = ToDataTable(reader);
-
-            using var wb = new XLWorkbook();
-            var ws = wb.Worksheets.Add(dt, tableUpper);
-
-            var tbl = ws.Tables.FirstOrDefault();
-            if (tbl != null) tbl.ShowAutoFilter = true;
-
-            ws.SheetView.FreezeRows(1);
-            ApplyDateColumnFormats(ws, dt);
-            ApplyDateColumnFormats2(ws, dt);
-
-            // ДОПОЛНИТЕЛЬНАЯ СТРАХОВКА ДЛЯ EXCEL: полная точность чисел
-            foreach (DataColumn col in dt.Columns)
-            {
-                if (col.DataType == typeof(decimal) || col.DataType == typeof(double) || col.DataType == typeof(float))
+                // Обработка чисел: преобразуем в строку с полной точностью (G17 — максимум для decimal)
+                if (raw is decimal decVal)
                 {
-                    int colIndex = dt.Columns.IndexOf(col) + 1;
-                    ws.Column(colIndex).Style.NumberFormat.Format = "0.################################################################";
+                    row[i] = decVal.ToString("G17", CultureInfo.InvariantCulture);
+                }
+                else if (raw is double dblVal)
+                {
+                    row[i] = dblVal.ToString("G17", CultureInfo.InvariantCulture);
+                }
+                else if (raw is float fltVal)
+                {
+                    row[i] = fltVal.ToString("G17", CultureInfo.InvariantCulture);
+                }
+                else
+                {
+                    row[i] = raw;
                 }
             }
 
-            ws.Columns().AdjustToContents();
-
-            byte[] bytes;
-            using (var ms = new MemoryStream())
-            {
-                wb.SaveAs(ms);
-                bytes = ms.ToArray();
-            }
-
-            var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
-            return File(bytes, ContentTypeXlsx, fileName);
+            dt.Rows.Add(row);
         }
-        catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
+        // === Конец ручного создания DataTable ===
+
+        using var wb = new XLWorkbook();
+        var ws = wb.Worksheets.Add(dt, tableUpper);
+
+        var tbl = ws.Tables.FirstOrDefault();
+        if (tbl != null) tbl.ShowAutoFilter = true;
+
+        ws.SheetView.FreezeRows(1);
+        ApplyDateColumnFormats(ws, dt);
+        ApplyDateColumnFormats2(ws, dt);
+
+        // Больше НЕ нужно принудительно задавать числовой формат — числа уже строки
+        // Убираем авто-подгонку ширины по содержимому, если мешает (опционально)
+        ws.Columns().AdjustToContents();
+
+        byte[] bytes;
+        using (var ms = new MemoryStream())
         {
-            using var wbEmpty = new XLWorkbook();
-            var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
-            wsEmpty.Cell(1, 1).Value = "Нет данных";
-            wsEmpty.Columns().AdjustToContents();
-
-            byte[] emptyBytes;
-            using (var msEmpty = new MemoryStream())
-            {
-                wbEmpty.SaveAs(msEmpty);
-                emptyBytes = msEmpty.ToArray();
-            }
-
-            return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
+            wb.SaveAs(ms);
+            bytes = ms.ToArray();
         }
-        catch (Exception ex)
-        {
-            return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
-        }
+
+        var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
+        return File(bytes, ContentTypeXlsx, fileName);
     }
-
-    // Остальные методы без изменений (ResolveDateColumn, BuildSql, BindDateParams, OnGetTablesState, ParseDate, GetColumns, TimeColumns, TimeColumns2, ToDataTable, ApplyDateColumnFormats, ApplyDateColumnFormats2)
-
-    private static string ResolveDateColumn(string tableUpper)
-        => DefaultDateColumnByTable.TryGetValue(tableUpper, out var col) ? col : "DT";
-
-    private static string BuildSqlPaged(/* параметры */) { /* без изменений */ }
-    private static string BuildSql(/* параметры */) { /* без изменений */ }
-    private static void BindDateParams(OracleCommand cmd, DateTime? startDate, DateTime? endDate) { /* без изменений */ }
-    public IActionResult OnGetTablesState() { /* без изменений */ }
-    private static DateTime? ParseDate(string? s) { /* без изменений */ }
-    private static List<string> GetColumns(OracleConnection conn, string tableUpper, HashSet<string> exclude) { /* без изменений */ }
-
-    private static readonly HashSet<string> TimeColumns = new(StringComparer.OrdinalIgnoreCase)
+    catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
     {
-        "created_date", "updated_date", "deleted_date","create_date","sample_datetime","date_create",
-    };
+        // Обработка случая "нет данных" — остаётся без изменений
+        using var wbEmpty = new XLWorkbook();
+        var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
+        wsEmpty.Cell(1, 1).Value = "Нет данных";
+        wsEmpty.Columns().AdjustToContents();
 
-    private static readonly HashSet<string> TimeColumns2 = new(StringComparer.OrdinalIgnoreCase)
+        byte[] emptyBytes;
+        using (var msEmpty = new MemoryStream())
+        {
+            wbEmpty.SaveAs(msEmpty);
+            emptyBytes = msEmpty.ToArray();
+        }
+
+        return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
+    }
+    catch (Exception ex)
     {
-        "TIMES_NACH","TIMES_KON","T1","VREMYA"
-    };
-
-    private static DataTable ToDataTable(OracleDataReader reader) { /* без изменений */ }
-
-    private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt) { /* без изменений */ }
-    private static void ApplyDateColumnFormats2(IXLWorksheet ws, DataTable dt) { /* без изменений */ }
+        return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
+    }
 }
