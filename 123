@@ -30,6 +30,7 @@ window.exportExcel = async function(table) {
       const ws = wb.Sheets[sheetName];
       if (!ws['!ref']) return;
 
+      // ---------- обработка ячеек ----------
       Object.keys(ws).forEach(addr => {
         if (addr[0] === '!') return;
 
@@ -39,7 +40,7 @@ window.exportExcel = async function(table) {
         const abs = Math.abs(c.v);
         const frac = abs % 1;
 
-        // 🕒 ТОЛЬКО ВРЕМЯ (включая отрицательные значения)
+        // 🕒 ВРЕМЯ (включая отрицательные значения)
         if (frac > 0 && abs < 1.5) {
           const totalMinutes = Math.round(frac * 24 * 60);
           const h = Math.floor(totalMinutes / 60) % 24;
@@ -67,7 +68,11 @@ window.exportExcel = async function(table) {
         }
       });
 
+      // ---------- автоширина ----------
       autoFitColumns(ws);
+
+      // ---------- ВКЛЮЧАЕМ ФИЛЬТР ----------
+      ws['!autofilter'] = { ref: ws['!ref'] };
     });
 
     const out = XLSX.write(wb, {
