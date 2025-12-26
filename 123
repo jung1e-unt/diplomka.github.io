@@ -1,49 +1,31 @@
-    private static void ApplyDateColumnFormats(IXLWorksheet ws, DataTable dt)
+private static void ApplyDateColumnFormats2(IXLWorksheet ws, DataTable dt)
+{
+    var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
     {
-        // Целевые столбцы, которым нужен формат с временем
-        var timeColumns = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-        "created_date", "updated_date", "deleted_date","create_date","sample_datetime","date_create"
+        "TIMES_NACH", "TIMES_KON", "T1", "VREMYA"
     };
 
-        for (int i = 0; i < dt.Columns.Count; i++)
+    for (int i = 0; i < dt.Columns.Count; i++)
+    {
+        var col = dt.Columns[i];
+
+        if (col.DataType != typeof(DateTime))
+            continue;
+
+        if (!timeColumns.Contains(col.ColumnName))
+            continue;
+
+        var xlCol = ws.Column(i + 1);
+
+        foreach (var cell in xlCol.CellsUsed().Skip(1)) // пропускаем заголовок
         {
-            var col = dt.Columns[i];
-
-            if (col.DataType == typeof(DateTime))
+            if (cell.Value is DateTime dtVal)
             {
-                if (timeColumns.Contains(col.ColumnName))
-                {
-                    ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yyyy hh:mm:ss";
-
-                }
-                else
-                {
-                    ws.Column(i + 1).Style.DateFormat.Format = "dd.MM.yyyy";
-                }
+                // КЛЮЧЕВОЕ МЕСТО
+                cell.Value = dtVal.TimeOfDay;
             }
         }
+
+        xlCol.Style.NumberFormat.Format = "hh:mm";
     }
-
-    private static void ApplyDateColumnFormats2(IXLWorksheet ws, DataTable dt)
-    {
-        // Целевые столбцы, которым нужен формат с временем
-        var timeColumns2 = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-    {
-    "TIMES_NACH","TIMES_KON","T1","VREMYA"
-    };
-
-        for (int i = 0; i < dt.Columns.Count; i++)
-        {
-            var col = dt.Columns[i];
-
-            if (col.DataType == typeof(DateTime))
-            {
-                if (timeColumns2.Contains(col.ColumnName))
-                {
-                    ws.Column(i + 1).Style.DateFormat.Format = "hh:mm";
-
-                }
-            }
-        }
-    }
+}
