@@ -30,48 +30,60 @@ window.exportExcel = async function(table) {
       const ws = wb.Sheets[sheetName];
       if (!ws['!ref']) return;
 
-      // ---------- обработка ячеек ----------
       Object.keys(ws).forEach(addr => {
         if (addr[0] === '!') return;
 
         const c = ws[addr];
         if (!c || c.t !== 'n' || typeof c.v !== 'number') return;
 
-        const abs = Math.abs(c.v);
+        const v = c.v;
+        const abs = Math.abs(v);
         const frac = abs % 1;
 
-        // 🕒 ВРЕМЯ (включая отрицательные значения)
-        if (frac > 0 && abs < 1.5) {
-          const totalMinutes = Math.round(frac * 24 * 60);
-          const h = Math.floor(totalMinutes / 60) % 24;
-          const m = totalMinutes % 60;
+        // ================= 🕒 ЧИСТОЕ ВРЕМЯ =================
+        if (abs < 1 && frac > 0) {
+          const minutes = Math.round(frac * 1440);
+          const h = Math.floor(minutes / 60) % 24;
+          const m = minutes % 60;
 
           c.t = 's';
-          c.v = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+          c.v = `${pad(h)}:${pad(m)}`;
           delete c.z;
           return;
         }
 
-        // 📅 ДАТА + ВРЕМЯ < 1900 → текст
-        const d = XLSX.SSF.parse_date_code(c.v);
-        if (!d) return;
+        // ================= 📅 ДАТА / ДАТА+ВРЕМЯ =================
+        if (abs >= 1 && abs < 60000) { // защита от обычных чисел
+          const d = XLSX.SSF.parse_date_code(v);
+          if (!d || !d.y) return;
 
-        const jsDate = new Date(
-          d.y, d.m - 1, d.d,
-          d.H || 0, d.M || 0, d.S || 0
-        );
+          const jsDate = new Date(
+            d.y, d.m - 1, d.d,
+            d.H || 0, d.M || 0, d.S || 0
+          );
 
-        if (jsDate < new Date(1900, 0, 1)) {
-          c.t = 's';
-          c.v = formatDateTime(jsDate);
-          delete c.z;
+          // ДО 1900 → текст
+          if (jsDate < new Date(1900, 0, 1)) {
+            c.t = 's';
+            c.v = frac > 0
+              ? formatDateTime(jsDate)
+              : formatDate(jsDate);
+            delete c.z;
+            return;
+          }
+
+          // >= 1900 → оставляем числом (Excel сам форматирует)
+          if (frac === 0) {
+            c.z = 'dd.mm.yyyy';
+          } else {
+            c.z = 'dd.mm.yyyy hh:mm';
+          }
         }
       });
 
-      // ---------- автоширина ----------
       autoFitColumns(ws);
 
-      // ---------- ВКЛЮЧАЕМ ФИЛЬТР ----------
+      // фильтр по заголовкам
       ws['!autofilter'] = { ref: ws['!ref'] };
     });
 
@@ -96,9 +108,14 @@ window.exportExcel = async function(table) {
 
 // ================= HELPERS =================
 
+const pad = n => String(n).padStart(2,'0');
+
+function formatDate(d) {
+  return `${pad(d.getDate())}.${pad(d.getMonth()+1)}.${d.getFullYear()}`;
+}
+
 function formatDateTime(d) {
-  const p = n => String(n).padStart(2,'0');
-  return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return `${formatDate(d)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function autoFitColumns(ws) {
@@ -130,7 +147,6 @@ function download(blob, name) {
 
 function formatNowForFile() {
   const d = new Date();
-  const p = n => String(n).padStart(2,'0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}`;
 }
 </script>
