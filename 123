@@ -21,7 +21,6 @@ window.exportExcel = async function(table) {
 
     const buffer = await resp.arrayBuffer();
 
-    // ===== ЧИТАЕМ XLSX =====
     const wb = XLSX.read(buffer, {
       type: 'array',
       cellDates: false
@@ -31,31 +30,36 @@ window.exportExcel = async function(table) {
       const ws = wb.Sheets[sheetName];
       if (!ws['!ref']) return;
 
-      // ===== ОБРАБОТКА ЯЧЕЕК =====
       Object.keys(ws).forEach(addr => {
         if (addr[0] === '!') return;
 
         const c = ws[addr];
-        if (!c || c.t !== 'n') return;
+        if (!c || c.t !== 'n' || typeof c.v !== 'number') return;
 
-        const d = XLSX.SSF.parse_date_code(c.v);
-        if (!d) return;
+        const abs = Math.abs(c.v);
+        const frac = abs % 1;
 
-        // 🕒 ТОЛЬКО ВРЕМЯ (Excel хранит < 1)
-        if (c.v < 1) {
+        // 🕒 ТОЛЬКО ВРЕМЯ (включая отрицательные значения)
+        if (frac > 0 && abs < 1.5) {
+          const totalMinutes = Math.round(frac * 24 * 60);
+          const h = Math.floor(totalMinutes / 60) % 24;
+          const m = totalMinutes % 60;
+
           c.t = 's';
-          c.v = formatTime(d);
+          c.v = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
           delete c.z;
           return;
         }
 
-        // 📅 ДАТА + ВРЕМЯ
+        // 📅 ДАТА + ВРЕМЯ < 1900 → текст
+        const d = XLSX.SSF.parse_date_code(c.v);
+        if (!d) return;
+
         const jsDate = new Date(
           d.y, d.m - 1, d.d,
           d.H || 0, d.M || 0, d.S || 0
         );
 
-        // ❗ Excel < 1900 → текст
         if (jsDate < new Date(1900, 0, 1)) {
           c.t = 's';
           c.v = formatDateTime(jsDate);
@@ -63,11 +67,9 @@ window.exportExcel = async function(table) {
         }
       });
 
-      // ===== АВТОШИРИНА СТОЛБЦОВ =====
       autoFitColumns(ws);
     });
 
-    // ===== СОХРАНЯЕМ XLSX =====
     const out = XLSX.write(wb, {
       bookType: 'xlsx',
       type: 'array'
@@ -89,13 +91,8 @@ window.exportExcel = async function(table) {
 
 // ================= HELPERS =================
 
-function formatTime(d) {
-  const p = n => String(n).padStart(2, '0');
-  return `${p(d.H)}:${p(d.M)}`;
-}
-
 function formatDateTime(d) {
-  const p = n => String(n).padStart(2, '0');
+  const p = n => String(n).padStart(2,'0');
   return `${p(d.getDate())}.${p(d.getMonth()+1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
@@ -105,18 +102,13 @@ function autoFitColumns(ws) {
 
   for (let C = range.s.c; C <= range.e.c; C++) {
     let maxLen = 8;
-
     for (let R = range.s.r; R <= range.e.r; R++) {
       const cell = ws[XLSX.utils.encode_cell({ r: R, c: C })];
       if (!cell || cell.v == null) continue;
-
-      const val = String(cell.v);
-      maxLen = Math.max(maxLen, val.length);
+      maxLen = Math.max(maxLen, String(cell.v).length);
     }
-
     cols[C] = { wch: Math.min(maxLen + 2, 40) };
   }
-
   ws['!cols'] = cols;
 }
 
