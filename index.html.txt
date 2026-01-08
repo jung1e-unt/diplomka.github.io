@@ -1,5 +1,33 @@
-<img class="img-qarm"
-     src="@Url.Content("~/css/img/logo_black.png")"
-     data-dark="@Url.Content("~/css/img/logo_black.png")"
-     data-light="@Url.Content("~/css/img/logo_white.png")"
-/>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const switchEl = document.getElementById('themeSwitch');
+    const root = document.documentElement;
+    const img = document.querySelector('.img-qarm');
+
+    if (!img || !switchEl) return;
+
+    const DARK_IMG = '@Url.Content("~/css/img/logo_black.png")';
+    const LIGHT_IMG = '@Url.Content("~/css/img/logo_white.png")';
+
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            root.setAttribute('data-theme', 'dark');
+            switchEl.checked = true;
+            img.src = DARK_IMG;
+        } else {
+            root.removeAttribute('data-theme');
+            switchEl.checked = false;
+            img.src = LIGHT_IMG;
+        }
+        localStorage.setItem('theme', theme);
+    }
+
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(savedTheme);
+
+    switchEl.addEventListener('change', () => {
+        applyTheme(switchEl.checked ? 'dark' : 'light');
+    });
+});
+</script>
