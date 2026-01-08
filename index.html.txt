@@ -1,38 +1,6 @@
-<button id="themeToggle" class="btn-secondary">
-    🌙 Тёмная тема
-</button>
-<script>
-(function () {
-    const btn = document.getElementById('themeToggle');
-    const root = document.documentElement;
-
-    // загрузка темы
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        root.setAttribute('data-theme', savedTheme);
-        updateButton(savedTheme);
-    }
-
-    btn.addEventListener('click', () => {
-        const currentTheme = root.getAttribute('data-theme') === 'dark'
-            ? 'light'
-            : 'dark';
-
-        root.setAttribute('data-theme', currentTheme);
-        localStorage.setItem('theme', currentTheme);
-        updateButton(currentTheme);
-    });
-
-    function updateButton(theme) {
-        btn.textContent = theme === 'dark'
-            ? '☀️ Светлая тема'
-            : '🌙 Тёмная тема';
-    }
-})();
-</script>
-/* ===============================
-   СВЕТЛАЯ ТЕМА (ПО УМОЛЧАНИЮ)
-   =============================== */
+/* ======================================================
+   СВЕТЛАЯ ТЕМА (ПО УМОЛЧАНИЮ — ТВОЙ ОРИГИНАЛ)
+   ====================================================== */
 :root {
     --bg: #ffffff;
     --sidebar-bg: #ffffff;
@@ -60,9 +28,9 @@
     --sidebar-w-md: 300px;
 }
 
-/* ===============================
-   ТЁМНАЯ ТЕМА
-   =============================== */
+/* ======================================================
+   ТЁМНАЯ ТЕМА (ДОБАВЛЕНО)
+   ====================================================== */
 [data-theme="dark"] {
     --bg: #0f172a;
     --sidebar-bg: #020617;
@@ -82,9 +50,9 @@
     --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.8);
 }
 
-/* ===============================
+/* ======================================================
    BASE
-   =============================== */
+   ====================================================== */
 *, *::before, *::after {
     box-sizing: border-box;
 }
@@ -94,14 +62,15 @@ html, body {
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font-family: system-ui, Segoe UI, Roboto, Ubuntu, Arial, sans-serif;
+    font-family: system-ui, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif;
     font-size: 16px;
     line-height: 1.6;
+    overflow-x: hidden;
 }
 
-/* ===============================
+/* ======================================================
    LAYOUT
-   =============================== */
+   ====================================================== */
 .layout {
     display: grid;
     grid-template-columns: var(--sidebar-w) 1fr;
@@ -110,18 +79,49 @@ html, body {
     padding: 16px;
 }
 
-.sidebar,
+@media (max-width: 1024px) {
+    .layout {
+        grid-template-columns: var(--sidebar-w-md) 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto 1fr;
+        height: auto;
+        min-height: 100vh;
+    }
+}
+
+.sidebar {
+    background: var(--sidebar-bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 14px;
+    height: 100%;
+    overflow-y: auto;
+    box-shadow: var(--shadow-sm);
+}
+
 .content {
     background: var(--content-bg);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     padding: 14px;
+    overflow: auto;
     box-shadow: var(--shadow-sm);
 }
 
-/* ===============================
+/* ======================================================
    TABLE
-   =============================== */
+   ====================================================== */
+.table-wrap {
+    overflow: auto;
+    max-height: 72vh;
+    border-radius: var(--radius-md);
+}
+
 table {
     border-collapse: collapse;
     width: 100%;
@@ -138,6 +138,7 @@ th {
     background: var(--table-header);
     position: sticky;
     top: 0;
+    z-index: 1;
 }
 
 tr:nth-child(even) td {
@@ -148,9 +149,9 @@ tr:nth-child(even) td {
     background: #020617;
 }
 
-/* ===============================
+/* ======================================================
    BUTTONS
-   =============================== */
+   ====================================================== */
 .btn,
 .btn-secondary {
     padding: 8px 12px;
@@ -160,7 +161,7 @@ tr:nth-child(even) td {
     cursor: pointer;
     color: #fff;
     background: #0D2533;
-    transition: background var(--transition);
+    transition: background var(--transition), transform var(--transition-fast);
 }
 
 .btn:hover,
@@ -168,26 +169,28 @@ tr:nth-child(even) td {
     background: var(--primary-hover);
 }
 
-/* ===============================
-   DROPDOWN
-   =============================== */
+.btn:active,
+.btn-secondary:active {
+    transform: translateY(1px);
+}
+
+/* ======================================================
+   DROPDOWN / LISTS
+   ====================================================== */
 .dropdown-toggle,
 .dropdown-menu,
 .selected-btn,
-.table-btn {
+.table-btn,
+.group-actions button {
     background: var(--content-bg);
     color: var(--text);
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
 }
 
-.dropdown-menu {
-    box-shadow: var(--shadow-md);
-}
-
-/* ===============================
+/* ======================================================
    SCROLLBAR
-   =============================== */
+   ====================================================== */
 ::-webkit-scrollbar {
     width: 10px;
 }
@@ -198,6 +201,7 @@ tr:nth-child(even) td {
 
 ::-webkit-scrollbar-thumb {
     background: #bbb;
+    border-radius: 6px;
 }
 
 [data-theme="dark"] ::-webkit-scrollbar-track {
@@ -208,31 +212,46 @@ tr:nth-child(even) td {
     background: #334155;
 }
 
-/* ===============================
+/* ======================================================
    MODALS
-   =============================== */
+   ====================================================== */
 .export-modal,
 .error-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
     background: rgba(0,0,0,0.35);
+    z-index: 99999;
+    justify-content: center;
+    align-items: center;
 }
 
 .export-modal-box,
 .error-modal-box {
     background: var(--content-bg);
     color: var(--text);
+    padding: 26px 34px;
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
 }
 
-/* ===============================
+/* ======================================================
    PRINT
-   =============================== */
+   ====================================================== */
 @media print {
+    .layout {
+        display: block;
+        padding: 0;
+    }
+
     .sidebar {
         display: none;
     }
+
     .content {
         border: none;
         box-shadow: none;
+        background: #fff;
+        color: #000;
     }
 }
