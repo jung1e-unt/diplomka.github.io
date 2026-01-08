@@ -1,257 +1,100 @@
-/* ======================================================
-   СВЕТЛАЯ ТЕМА (ПО УМОЛЧАНИЮ — ТВОЙ ОРИГИНАЛ)
-   ====================================================== */
-:root {
-    --bg: #ffffff;
-    --sidebar-bg: #ffffff;
-    --content-bg: #ffffff;
-    --border: #e5e7eb;
-    --text: #333333;
-    --muted: #6b7280;
-    --primary: #2e7d32;
-    --primary-hover: #136FDB;
-    --danger: #c62828;
-    --table-header: #f9fafb;
-
-    --shadow-sm: 0 2px 8px rgba(17, 24, 39, 0.06);
-    --shadow-md: 0 8px 20px rgba(17, 24, 39, 0.08);
-    --shadow-lg: 0 16px 32px rgba(17, 24, 39, 0.10);
-
-    --radius-sm: 8px;
-    --radius-md: 12px;
-    --radius-lg: 16px;
-
-    --transition-fast: 140ms ease;
-    --transition: 240ms ease;
-
-    --sidebar-w: 380px;
-    --sidebar-w-md: 300px;
+.dropdown {
+    position: relative;
 }
 
-/* ======================================================
-   ТЁМНАЯ ТЕМА (ДОБАВЛЕНО)
-   ====================================================== */
-[data-theme="dark"] {
-    --bg: #0f172a;
-    --sidebar-bg: #020617;
-    --content-bg: #020617;
-    --border: #1e293b;
-    --text: #e5e7eb;
-    --muted: #94a3b8;
-
-    --primary: #22c55e;
-    --primary-hover: #16a34a;
-    --danger: #ef4444;
-
-    --table-header: #020617;
-
-    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.6);
-    --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.7);
-    --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.8);
+.dropdown-actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 8px;
+    border-top: 1px solid var(--border);
 }
 
-/* ======================================================
-   BASE
-   ====================================================== */
-*, *::before, *::after {
-    box-sizing: border-box;
-}
-
-html, body {
-    height: 100%;
-    margin: 0;
-    background: var(--bg);
-    color: var(--text);
-    font-family: system-ui, Segoe UI, Roboto, Ubuntu, Cantarell, Arial, sans-serif;
-    font-size: 16px;
-    line-height: 1.6;
-    overflow-x: hidden;
-}
-
-/* ======================================================
-   LAYOUT
-   ====================================================== */
-.layout {
-    display: grid;
-    grid-template-columns: var(--sidebar-w) 1fr;
-    gap: 16px;
-    height: 100vh;
-    padding: 16px;
-}
-
-@media (max-width: 1024px) {
-    .layout {
-        grid-template-columns: var(--sidebar-w-md) 1fr;
-    }
-}
-
-@media (max-width: 768px) {
-    .layout {
-        grid-template-columns: 1fr;
-        grid-template-rows: auto 1fr;
-        height: auto;
-        min-height: 100vh;
-    }
-}
-
-.sidebar {
-    background: var(--sidebar-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px;
-    height: 100%;
-    overflow-y: auto;
-    box-shadow: var(--shadow-sm);
-}
-
-.content {
-    background: var(--content-bg);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
-    padding: 14px;
-    overflow: auto;
-    box-shadow: var(--shadow-sm);
-}
-
-/* ======================================================
-   TABLE
-   ====================================================== */
-.table-wrap {
-    overflow: auto;
-    max-height: 72vh;
-    border-radius: var(--radius-md);
-}
-
-table {
-    border-collapse: collapse;
+.dropdown-toggle {
     width: 100%;
-    min-width: 640px;
-}
-
-th, td {
+    padding: 10px 12px;
     border: 1px solid var(--border);
-    padding: 8px 10px;
-    white-space: nowrap;
-}
-
-th {
-    background: var(--table-header);
-    position: sticky;
-    top: 0;
-    z-index: 1;
-}
-
-tr:nth-child(even) td {
-    background: #fcfcfc;
-}
-
-[data-theme="dark"] tr:nth-child(even) td {
-    background: #020617;
-}
-
-/* ======================================================
-   BUTTONS
-   ====================================================== */
-.btn,
-.btn-secondary {
-    padding: 8px 12px;
-    height: 30px;
-    border: none;
     border-radius: var(--radius-sm);
+    background: #FFFFFF;
+    color: var(--text);
     cursor: pointer;
-    color: #fff;
-    background: #0D2533;
-    transition: background var(--transition), transform var(--transition-fast);
+    text-align: left;
+    font-size: 15px;
+    transition: background var(--transition), box-shadow var(--transition);
 }
 
-.btn:hover,
-.btn-secondary:hover {
-    background: var(--primary-hover);
+    .dropdown-toggle:hover {
+        background: #136FDB;
+        box-shadow: var(--shadow-sm);
+    }
+
+.dropdown-menu {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    z-index: 1000;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    display: none;
+    max-height: 60vh;
+    overflow: hidden;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity var(--transition), transform var(--transition);
 }
 
-.btn:active,
-.btn-secondary:active {
-    transform: translateY(1px);
+    .dropdown-menu.open {
+        display: block;
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+.dropdown-header {
+    padding: 10px;
+    border-bottom: 1px solid var(--border);
+    background: #f5f7fa;
 }
 
-/* ======================================================
-   DROPDOWN / LISTS
-   ====================================================== */
-.dropdown-toggle,
-.dropdown-menu,
-.selected-btn,
-.table-btn,
-.group-actions button {
-    background: var(--content-bg);
-    color: var(--text);
+.dropdown-search {
+    width: 100%;
+    padding: 8px 10px;
     border: 1px solid var(--border);
     border-radius: var(--radius-sm);
+    font-size: 15px;
 }
 
-/* ======================================================
-   SCROLLBAR
-   ====================================================== */
-::-webkit-scrollbar {
-    width: 10px;
+.dropdown-groups {
+    padding: 10px;
+    max-height: 44vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
 }
 
-::-webkit-scrollbar-track {
-    background: #eee;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #bbb;
-    border-radius: 6px;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-track {
-    background: #020617;
-}
-
-[data-theme="dark"] ::-webkit-scrollbar-thumb {
-    background: #334155;
-}
-
-/* ======================================================
-   MODALS
-   ====================================================== */
-.export-modal,
-.error-modal {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.35);
-    z-index: 99999;
-    justify-content: center;
+.selected-btn {
+    display: inline-flex;
     align-items: center;
-}
-
-.export-modal-box,
-.error-modal-box {
-    background: var(--content-bg);
+    gap: 8px;
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fff;
     color: var(--text);
-    padding: 26px 34px;
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
+    cursor: pointer;
+    text-align: left;
+    transition: background var(--transition), box-shadow var(--transition), border-color var(--transition), color var(--transition);
 }
 
-/* ======================================================
-   PRINT
-   ====================================================== */
-@media print {
-    .layout {
-        display: block;
-        padding: 0;
+    .selected-btn:hover {
+        background: #136FDB;
+        box-shadow: var(--shadow-sm);
     }
 
-    .sidebar {
-        display: none;
+    .selected-btn.active {
+        background: rgba(19, 111, 219, 0.50);
+        border-color: #136FDB;
+        box-shadow: 0 0 0 2px rgba(19, 111, 219, 0.15);
     }
-
-    .content {
-        border: none;
-        box-shadow: none;
-        background: #fff;
-        color: #000;
-    }
-}
