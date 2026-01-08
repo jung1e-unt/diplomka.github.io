@@ -1,81 +1,35 @@
+<img
+    class="img-qarm"
+    src="/img/logo-dark.png"
+    data-dark="/img/logo-dark.png"
+    data-light="/img/logo-light.png"
+    alt="logo"
+/>
+
 <script>
 (function () {
     const switchEl = document.getElementById('themeSwitch');
     const root = document.documentElement;
+    const img = document.querySelector('.img-qarm');
 
-    const savedTheme = localStorage.getItem('theme');
-
-    if (savedTheme === 'dark') {
-        root.setAttribute('data-theme', 'dark');
-        switchEl.checked = true;
-    }
-
-    switchEl.addEventListener('change', () => {
-        if (switchEl.checked) {
+    function applyTheme(theme) {
+        if (theme === 'dark') {
             root.setAttribute('data-theme', 'dark');
-            localStorage.setItem('theme', 'dark');
+            switchEl.checked = true;
+            if (img) img.src = img.dataset.dark;
         } else {
             root.removeAttribute('data-theme');
-            localStorage.setItem('theme', 'light');
+            switchEl.checked = false;
+            if (img) img.src = img.dataset.light;
         }
+        localStorage.setItem('theme', theme);
+    }
+
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    applyTheme(savedTheme);
+
+    switchEl.addEventListener('change', () => {
+        applyTheme(switchEl.checked ? 'dark' : 'light');
     });
 })();
 </script>
-/* ===============================
-   THEME SWITCH (TOGGLE)
-   =============================== */
-.theme-switch {
-    position: relative;
-    width: 52px;
-    height: 28px;
-    display: inline-block;
-}
-
-.theme-switch input {
-    display: none;
-}
-
-.theme-slider {
-    position: absolute;
-    inset: 0;
-    background: #e5e7eb;
-    border-radius: 999px;
-    cursor: pointer;
-    transition: background var(--transition);
-}
-
-.theme-slider::before {
-    content: "";
-    position: absolute;
-    width: 22px;
-    height: 22px;
-    left: 3px;
-    top: 3px;
-    background: #ffffff;
-    border-radius: 50%;
-    transition: transform var(--transition), background var(--transition);
-    box-shadow: var(--shadow-sm);
-}
-
-/* ON */
-.theme-switch input:checked + .theme-slider {
-    background: var(--primary);
-}
-
-.theme-switch input:checked + .theme-slider::before {
-    transform: translateX(24px);
-}
-
-/* DARK TWEAKS */
-[data-theme="dark"] .theme-slider {
-    background: #334155;
-}
-
-[data-theme="dark"] .theme-slider::before {
-    background: #020617;
-}
-
-<label class="theme-switch">
-    <input type="checkbox" id="themeSwitch">
-    <span class="theme-slider"></span>
-</label>
