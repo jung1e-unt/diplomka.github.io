@@ -1,35 +1,32 @@
-<img
-    class="img-qarm"
-    src="/img/logo-dark.png"
-    data-dark="/img/logo-dark.png"
-    data-light="/img/logo-light.png"
-    alt="logo"
-/>
+             <img class="img-qarm"
+                 src="~/css/img/logo_black.png"
+                 data-dark="~/css/img/logo_black.png"
+                 data-light="~/css/img/logo_white.png"
+                 />
+            <script>
+                (function () {
+                    const switchEl = document.getElementById('themeSwitch');
+                    const root = document.documentElement;
+                    const img = document.querySelector('.img-qarm');
 
-<script>
-(function () {
-    const switchEl = document.getElementById('themeSwitch');
-    const root = document.documentElement;
-    const img = document.querySelector('.img-qarm');
+                    function applyTheme(theme) {
+                        if (theme === 'dark') {
+                            root.setAttribute('data-theme', 'dark');
+                            switchEl.checked = true;
+                            if (img) img.src = img.dataset.dark;
+                        } else {
+                            root.removeAttribute('data-theme');
+                            switchEl.checked = false;
+                            if (img) img.src = img.dataset.light;
+                        }
+                        localStorage.setItem('theme', theme);
+                    }
 
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            root.setAttribute('data-theme', 'dark');
-            switchEl.checked = true;
-            if (img) img.src = img.dataset.dark;
-        } else {
-            root.removeAttribute('data-theme');
-            switchEl.checked = false;
-            if (img) img.src = img.dataset.light;
-        }
-        localStorage.setItem('theme', theme);
-    }
+                    const savedTheme = localStorage.getItem('theme') || 'light';
+                    applyTheme(savedTheme);
 
-    const savedTheme = localStorage.getItem('theme') || 'light';
-    applyTheme(savedTheme);
-
-    switchEl.addEventListener('change', () => {
-        applyTheme(switchEl.checked ? 'dark' : 'light');
-    });
-})();
-</script>
+                    switchEl.addEventListener('change', () => {
+                        applyTheme(switchEl.checked ? 'dark' : 'light');
+                    });
+                })();
+            </script>
