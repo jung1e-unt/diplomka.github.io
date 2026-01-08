@@ -1,66 +1,81 @@
+<script>
+(function () {
+    const switchEl = document.getElementById('themeSwitch');
+    const root = document.documentElement;
+
+    const savedTheme = localStorage.getItem('theme');
+
+    if (savedTheme === 'dark') {
+        root.setAttribute('data-theme', 'dark');
+        switchEl.checked = true;
+    }
+
+    switchEl.addEventListener('change', () => {
+        if (switchEl.checked) {
+            root.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            root.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+        }
+    });
+})();
+</script>
 /* ===============================
-   DARK THEME — DROPDOWN
+   THEME SWITCH (TOGGLE)
    =============================== */
-[data-theme="dark"] .dropdown-toggle {
-    background: #020617;
-    color: var(--text);
-    border-color: var(--border);
+.theme-switch {
+    position: relative;
+    width: 52px;
+    height: 28px;
+    display: inline-block;
 }
 
-[data-theme="dark"] .dropdown-toggle:hover {
-    background: var(--primary-hover);
+.theme-switch input {
+    display: none;
+}
+
+.theme-slider {
+    position: absolute;
+    inset: 0;
+    background: #e5e7eb;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: background var(--transition);
+}
+
+.theme-slider::before {
+    content: "";
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    left: 3px;
+    top: 3px;
+    background: #ffffff;
+    border-radius: 50%;
+    transition: transform var(--transition), background var(--transition);
     box-shadow: var(--shadow-sm);
 }
 
-[data-theme="dark"] .dropdown-menu {
-    background: #020617;
-    border-color: var(--border);
-    box-shadow: var(--shadow-md);
+/* ON */
+.theme-switch input:checked + .theme-slider {
+    background: var(--primary);
 }
 
-[data-theme="dark"] .dropdown-header {
-    background: #020617;
-    color: var(--text);
-    border-bottom-color: var(--border);
+.theme-switch input:checked + .theme-slider::before {
+    transform: translateX(24px);
 }
 
-[data-theme="dark"] .dropdown-search {
-    background: #020617;
-    color: var(--text);
-    border-color: var(--border);
+/* DARK TWEAKS */
+[data-theme="dark"] .theme-slider {
+    background: #334155;
 }
 
-[data-theme="dark"] .dropdown-search::placeholder {
-    color: var(--muted);
-}
-
-[data-theme="dark"] .dropdown-groups {
+[data-theme="dark"] .theme-slider::before {
     background: #020617;
 }
 
-/* ===============================
-   SELECTED BUTTONS
-   =============================== */
-[data-theme="dark"] .selected-btn {
-    background: #020617;
-    color: var(--text);
-    border-color: var(--border);
-}
-
-[data-theme="dark"] .selected-btn:hover {
-    background: var(--primary-hover);
-    box-shadow: var(--shadow-sm);
-}
-
-[data-theme="dark"] .selected-btn.active {
-    background: rgba(34, 197, 94, 0.35);
-    border-color: var(--primary);
-    box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25);
-}
-
-/* ===============================
-   DROPDOWN ACTIONS
-   =============================== */
-[data-theme="dark"] .dropdown-actions {
-    border-top-color: var(--border);
-}
+<label class="theme-switch">
+    <input type="checkbox" id="themeSwitch">
+    <span class="theme-slider"></span>
+</label>
