@@ -1,151 +1,22 @@
-public IActionResult OnGetExport(string table, string? startDate, string? endDate, string? nPart, string? nPlaw)
-{
-    try
-    {
-        if (string.IsNullOrWhiteSpace(table))
-            return BadRequest("Table is required.");
-
-        var tableUpper = table.Trim().ToUpperInvariant();
-        if (!AllowedTables.Contains(tableUpper))
-            return BadRequest("Table is not allowed.");
-
-        var dateColumn = ResolveDateColumn(tableUpper);
-        var start = ParseDate(startDate);
-        var end = ParseDate(endDate);
-
-        var connString = _config.GetConnectionString("OracleConnection");
-        using var conn = new OracleConnection(connString);
-        conn.Open();
-
-        var columns = GetColumns(conn, tableUpper, DefaultExcludeColumns);
-        if (!columns.Any(c => string.Equals(c, dateColumn, StringComparison.OrdinalIgnoreCase)))
-            return BadRequest($"Колонка даты '{dateColumn}' отсутствует в {tableUpper}.");
-
-        var sql = BuildSql(tableUpper, columns, dateColumn, start, end, nPart, nPlaw);
-
-        using var cmd = new OracleCommand(sql, conn)
-        {
-            BindByName = true
-        };
-
-        BindDateParams(cmd, start, end);
-
-        if (!string.IsNullOrWhiteSpace(nPart) &&
-            columns.Any(c => string.Equals(c, "N_PART", StringComparison.OrdinalIgnoreCase)))
-        {
-            cmd.Parameters.Add(new OracleParameter("pNPart", OracleDbType.Varchar2) { Value = nPart });
-        }
-
-        if (!string.IsNullOrWhiteSpace(nPlaw) &&
-            columns.Any(c => string.Equals(c, "N_PLAW", StringComparison.OrdinalIgnoreCase)))
-        {
-            cmd.Parameters.Add(new OracleParameter("pNPlaw", OracleDbType.Varchar2) { Value = nPlaw });
-        }
-
-        using var reader = cmd.ExecuteReader();
-
-        // === КЛЮЧЕВАЯ ЧАСТЬ: ручное создание DataTable с сохранением точности чисел как строк ===
-        var schema = reader.GetColumnSchema();
-        var dt = new DataTable();
-
-        // Создаём колонки
-        foreach (var col in schema)
-        {
-            var columnName = col.ColumnName;
-            var dataType = col.DataType ?? typeof(object);
-
-            // Если это число с плавающей точкой — делаем колонку строковой для полной точности
-            if (dataType == typeof(decimal) || dataType == typeof(double) || dataType == typeof(float))
-            {
-                dt.Columns.Add(columnName, typeof(string));
-            }
-            else
-            {
-                dt.Columns.Add(columnName, dataType);
-            }
-        }
-
-        // Заполняем строки
-        while (reader.Read())
-        {
-            var row = dt.NewRow();
-
-            for (int i = 0; i < dt.Columns.Count; i++)
-            {
-                if (reader.IsDBNull(i))
-                {
-                    row[i] = DBNull.Value;
-                    continue;
-                }
-
-                var raw = reader[i];
-
-                // Обработка чисел: преобразуем в строку с полной точностью (G17 — максимум для decimal)
-                if (raw is decimal decVal)
-                {
-                    row[i] = decVal.ToString("G17", CultureInfo.InvariantCulture);
-                }
-                else if (raw is double dblVal)
-                {
-                    row[i] = dblVal.ToString("G17", CultureInfo.InvariantCulture);
-                }
-                else if (raw is float fltVal)
-                {
-                    row[i] = fltVal.ToString("G17", CultureInfo.InvariantCulture);
-                }
-                else
-                {
-                    row[i] = raw;
-                }
-            }
-
-            dt.Rows.Add(row);
-        }
-        // === Конец ручного создания DataTable ===
-
-        using var wb = new XLWorkbook();
-        var ws = wb.Worksheets.Add(dt, tableUpper);
-
-        var tbl = ws.Tables.FirstOrDefault();
-        if (tbl != null) tbl.ShowAutoFilter = true;
-
-        ws.SheetView.FreezeRows(1);
-        ApplyDateColumnFormats(ws, dt);
-        ApplyDateColumnFormats2(ws, dt);
-
-        // Больше НЕ нужно принудительно задавать числовой формат — числа уже строки
-        // Убираем авто-подгонку ширины по содержимому, если мешает (опционально)
-        ws.Columns().AdjustToContents();
-
-        byte[] bytes;
-        using (var ms = new MemoryStream())
-        {
-            wb.SaveAs(ms);
-            bytes = ms.ToArray();
-        }
-
-        var fileName = $"{tableUpper}_{DateTime.Now:ddMMyy}.xlsx";
-        return File(bytes, ContentTypeXlsx, fileName);
-    }
-    catch (OracleException ex) when (ex.Number == 8180 || ex.Number == 8181)
-    {
-        // Обработка случая "нет данных" — остаётся без изменений
-        using var wbEmpty = new XLWorkbook();
-        var wsEmpty = wbEmpty.Worksheets.Add(table.ToUpperInvariant());
-        wsEmpty.Cell(1, 1).Value = "Нет данных";
-        wsEmpty.Columns().AdjustToContents();
-
-        byte[] emptyBytes;
-        using (var msEmpty = new MemoryStream())
-        {
-            wbEmpty.SaveAs(msEmpty);
-            emptyBytes = msEmpty.ToArray();
-        }
-
-        return File(emptyBytes, ContentTypeXlsx, $"{table.ToUpperInvariant()}_{DateTime.Now:ddMMyy}.xlsx");
-    }
-    catch (Exception ex)
-    {
-        return StatusCode(500, $"Export failed: {ex.GetType().Name}: {ex.Message}");
-    }
-}
+⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣀⣀⣀⠄⠄⠄⠄⡀⠄⠄⡀⠠⣤⣄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠈⠉⢉⡏⠄⠄⠄⢸⡇⠄⣼⠇⠄⢀⡏⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⣸⣧⡤⣤⡀⠈⠓⠚⣿⠄⠄⣸⠳⠶⢶⡀⠄⠄
+⠄⠄⠄⠄⣀⡀⠄⠄⠄⠄⠄⠄⣿⠁⠄⣸⡇⣀⣠⡴⠟⠄⠄⣿⣀⣀⣼⠇⠄⠄
+⠄⣠⣶⣿⣿⣿⣿⠆⠄⠄⠄⠄⠻⠦⠶⠋⠄⠉⠄⠄⠄⠄⠄⠉⠉⠉⠁⠄⠄⠄
+⢰⣿⣿⡿⠛⠉⠉⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⢸⣿⣿⡇⠄⠄⠄⠄⠄⠄⠄⠄⠄⢀⣀⣠⣤⣀⣀⠄⠄⠄⠄⢀⣀⣀⣀⡀⠄⠄
+⠄⢿⣿⣧⠄⠄⠄⠄⠄⠄⢀⣴⣿⣿⣿⣿⣿⣿⣿⣷⣄⠄⣼⣿⣿⣿⣿⣿⣦⠄
+⠄⠘⣿⣿⣧⡀⠄⠄⠄⢠⣾⣿⣿⣿⣿⣿⣿⣿⢿⣿⣿⡀⠹⠿⠛⠉⢹⣿⣿⡄
+⠄⠄⠈⢿⣿⣿⣄⠄⢠⣿⣿⣿⣇⣍⢹⣿⣯⣰⣼⣿⡿⠁⠄⠄⠄⢀⣾⣿⣿⠃
+⠄⠄⠄⠈⢿⣿⣿⣶⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠿⠁⠄⠄⢀⣴⣾⣿⡿⠃⠄
+⠄⠄⠄⠄⠈⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣦⣤⣶⣿⣿⣿⠟⠋⠄⠄⠄
+⠄⠄⠄⠄⠄⠈⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠉⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⢻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠁⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⣿⠋⠉⠉⠉⠘⣿⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡏⠄⠄⠄⠄⠄⢹⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡇⠄⠄⠄⠄⠄⠸⣿⣿⣿⡄⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⣿⣿⣿⣿⠄⠄⠄⠄⠄⠄⠄⣿⣿⣿⣷⠄⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠄⣿⣿⣿⡇⠄⠄⠄⠄⠄⠄⠄⢸⣿⣿⣿⡆⠄⠄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⢰⣿⣿⣿⣄⠄⠄⠄⠄⠄⠄⠄⠈⣿⣿⣿⣿⣶⡄⠄⠄⠄⠄⠄⠄
+⠄⠄⠄⠄⠄⠈⠻⣿⣿⡟⠄⠄⠄⠄⠄⠄⠄⠄⢿⣿⣿⣿⠿⠃⠄⠄⠄⠄⠄⠄
